@@ -40,23 +40,23 @@ deployforge deploy ship app prod
 | Package | Responsibility |
 |---|---|
 | `fleet` | The fleet document's types, loading, validation and schema; units, users and paths derived from names |
-| `release` | Package a clean, tagged checkout into an archive with its revision and checksum |
-| `provenance` | Check every commit a release uses is pushed |
+| `schema` | The fleet and zones documents' generated JSON Schemas, embedded |
+| `release`, `provenance` | Package a clean, tagged checkout into an archive with its revision and checksum; name upstream commits |
 | `deploy/target` | Resolve an app stack to its host, unit, user, paths and ports |
-| `deploy/secrets` | Read a stack's prefix into environment, migrate-only variables and key files; a `Store` interface with an AWS SSM implementation |
-| `deploy/archive` | Verify an archive and its checksum |
-| `deploy/deployer` | The operator side: build the request, transfer, run on the host, record |
+| `deploy/secrets`, `deploy/secrets/awsssm` | Read a stack's prefix into environment, migrate-only variables and key files, and mask them; AWS SSM |
+| `deploy/archive` | Verify an archive and extract it safely |
+| `deploy/deployer` | The operator side: build the request, dial the stack's host, transfer, run on the host, record |
 | `deploy/onhost` | The host side: lock, unpack, install, validate, migrate, switch, health, restore, prune, audit |
-| `deploy/systemd` | Render units and their sandbox |
-| `deploy/caddy` | Render the Caddyfile |
-| `ledger` | Append and read the per-app JSON Lines ledger |
-| `hostsetup` | Render the idempotent host-setup script |
-| `zones` | The zone document and its verification against the CDN |
-| `zoneharden` | Plan, apply and verify a zone's baseline, from config |
-| `origincert` | Issue, list and revoke origin certificates |
-| `workersite` | Static sites on edge workers |
-| `dbroles` | Database and role plans, SCRAM verifiers, connection limits |
-| `dbsnapshot` | Database snapshots before a deploy |
+| `deploy/ship` | Package a tag or local commit in a temporary worktree with the app's release script |
+| `deploy/readiness` | Check every host name's /readyz from outside |
+| `deploy/hooks` | Run the operator's hooks around packaging, deploy and rollback |
+| `deploy/hostaddr` | Resolve a host's or server's address, and Pulumi configuration values |
+| `deploy/systemd`, `deploy/host` | Render units and their sandbox, and the idempotent host-setup script |
+| `deploy/caddy`, `deploy/cfranges` | Render a host's Caddyfile; Cloudflare's published proxy ranges |
+| `ledger` | Append and read the per-stack JSON Lines ledger |
+| `zones`, `zoneharden` | The zones document and its verification; the security baseline through Cloudflare's API |
+| `origincert` | Issue, list and revoke origin certificates, made on the host |
+| `dbroles`, `dbsnapshot` | Database and role plans with SCRAM verifiers and connection limits; snapshots of a Lightsail server |
 | `cli` | The Cobra command tree, mountable by a host tool |
 
 Each CDN or cloud API is behind an interface in the package that uses it,
@@ -73,21 +73,33 @@ types with `invopop/jsonschema` and embedded.
 ```json
 {
   "formatVersion": "1",
-  "hosts": [{ "name": "web-1", "address": "203.0.113.10", "sshUser": "ubuntu" }],
+  "hosts": [{ "name": "web-1", "addressFrom": { "pulumi": { "dir": "stack", "stack": "prod", "output": "staticIp" } } }],
+  "databaseServer": {
+    "endpointFrom": { "pulumi": { "dir": "stack", "stack": "prod", "output": "dbEndpoint" } },
+    "adminUser": "admin", "adminDatabase": "fleet",
+    "adminPassword": { "pulumiConfig": { "dir": "stack", "stack": "prod", "key": "fleet:dbMasterPassword" } },
+    "via": "web-1", "lightsailName": "fleet-prod-pg"
+  },
   "portRange": { "min": 8101, "max": 8199 },
   "apps": [{
     "name": "example-app",
     "repo": "github.com/example/example-app",
     "domain": "example.com",
+    "edge": "cloudflare",
     "secretPrefix": "/example/{stack}/example-app/",
+    "logFiles": ["security.jsonl"],
     "stateDirectory": false,
     "selfcheck": false,
     "stacks": {
       "prod": {
         "host": "web-1",
         "hosts": ["app.example.com", "auth.example.com"],
+        "loopbackHosts": ["auth.example.com"],
         "port": 8101,
-        "databases": [{ "name": "example", "appRole": true }],
+        "databases": [
+          { "name": "example_auth", "ownerDsn": "AUTH_DB_DSN" },
+          { "name": "example", "appRole": true, "ownerDsn": "migrate/EXAMPLE_PG_ADMIN_DSN", "appDsn": "EXAMPLE_PG_DSN" }
+        ],
         "status": "live",
         "limits": { "memoryMax": "512M", "cpuQuota": "50%", "connectionLimit": 10 }
       }

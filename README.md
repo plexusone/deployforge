@@ -11,14 +11,15 @@ the previous release on any failure, recording every release in a ledger.
 
 Your repository keeps the configuration; deployforge is the binary.
 
-> **Status:** in development, not yet released. Deploying a release works;
-> the host, edge and database commands are next. The design is in
-> [docs/specs](docs/specs/initiatives/INIT-DEPLOYFORGE-001/PRD.md).
+> **Status:** in development, not yet released. Deploying, the host, the
+> edge and databases work; static sites on Cloudflare Workers are next.
+> The design is in [docs/specs](docs/specs/initiatives/INIT-DEPLOYFORGE-001/PRD.md).
 
 ## Features
 
 - **Fleet document:** hosts, apps and their named stacks as JSON with a
-  generated schema, validated before anything runs.
+  generated schema, validated before anything runs. A host's address can
+  come from a Pulumi output.
 - **Releases from a clean, tagged, pushed commit:** a reproducible archive
   with its revision and checksum, packaged in a temporary worktree.
 - **Safe deploys:** release directories, an atomic switch, readiness on
@@ -27,10 +28,32 @@ Your repository keeps the configuration; deployforge is the binary.
   files, arguments or logs.
 - **A ledger** of every deploy and rollback, kept in your repository.
 - **Hooks** around packaging, deploy and rollback.
-- **systemd units** with a hardening sandbox and resource limits.
+- **The host around the apps:** systemd units with a hardening sandbox
+  and limits, an idempotent host-setup script, and a Caddyfile per host,
+  validated on the host before it is reloaded.
+- **The edge, optionally:** Cloudflare DNS zones checked against their
+  name servers, a security baseline applied through Cloudflare's API, and
+  origin certificates made on the host and signed by Cloudflare. An app
+  with no edge gets certificates from Caddy itself.
+- **Databases:** owner and app roles per database with connection limits
+  and SCRAM verifiers, their passwords kept in the parameter store, and a
+  snapshot of the server before deploying a primary stack.
 
-Planned: host setup and the Caddyfile, Cloudflare zones, hardening, origin
-certificates and Workers sites, and database roles and snapshots.
+## Commands
+
+| Command | Does |
+|---|---|
+| `validate`, `schema`, `next-port`, `unit` | Check the fleet document, print its schema, find a free port, print a unit |
+| `host setup <app> <stack> [--apply]` | Prepare a stack's user, directories and unit on its host |
+| `caddyfile <host>`, `caddy install <host>` | Render a host's Caddyfile, and install it after Caddy validates it there |
+| `release package <app>` | Package a clean, tagged checkout |
+| `deploy ship\|release\|rollback\|unlock <app> <stack>` | Deploy, roll back, or clear a stale lock |
+| `ledger record\|show\|current` | Record and read the deploy ledger |
+| `db roles plan\|apply\|verify <app> <stack>` | Provision a stack's databases and roles |
+| `db snapshot plan\|apply\|verify\|list` | Snapshot the database server |
+| `zones validate\|verify\|get\|page\|schema` | Check DNS zones against their name servers |
+| `zones harden plan\|apply\|verify` | Apply the security baseline to Cloudflare zones |
+| `origin-cert install\|issue\|list\|revoke` | Cloudflare origin certificates, made on the host |
 
 ## Quick Start
 
@@ -40,6 +63,10 @@ go install github.com/plexusone/deployforge/cmd/deployforge@latest
 deployforge schema > fleet.schema.json   # for your editor
 deployforge validate                     # checks fleet.json
 deployforge unit example-app prod        # the stack's systemd unit
+
+# Once per stack: its user, directories and unit, then Caddy.
+deployforge host setup example-app prod --apply
+deployforge caddy install web-1
 
 # A routine deploy: package the tag in a temporary worktree, deploy it with
 # stacks/example-app/prod/config.yaml, and check every host name.

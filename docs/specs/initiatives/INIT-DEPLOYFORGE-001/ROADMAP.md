@@ -21,23 +21,23 @@ Phases group the work; each phase's status follows from its items.
 | ID | Item | Status |
 |---|---|---|
 | RMI-DEPLOYFORGE-008 | systemd units with sandbox and resource limits | done |
-| RMI-DEPLOYFORGE-009 | Idempotent host setup per app stack | planned |
-| RMI-DEPLOYFORGE-010 | Caddyfile from the fleet document, validated on the host and reloaded | planned |
+| RMI-DEPLOYFORGE-009 | Idempotent host setup per app stack | done |
+| RMI-DEPLOYFORGE-010 | Caddyfile from the fleet document, validated on the host and reloaded | done |
 | RMI-DEPLOYFORGE-011 | Port allocation from the configured range, `next-port` | done |
-| RMI-DEPLOYFORGE-012 | Host addresses from a provisioning tool's outputs, Pulumi first | planned |
+| RMI-DEPLOYFORGE-012 | Host addresses from a provisioning tool's outputs, Pulumi first | done |
 
 ## Phase 3: The edge
 
 | ID | Item | Status |
 |---|---|---|
-| RMI-DEPLOYFORGE-013 | Zone document and verification against the CDN, with planned records | planned |
-| RMI-DEPLOYFORGE-014 | Zone hardening baseline as data: plan, apply, verify | planned |
-| RMI-DEPLOYFORGE-015 | Origin certificates made on the host and signed by the CDN | planned |
-| RMI-DEPLOYFORGE-016 | Static sites on edge workers, deployed from a tag and recorded | planned |
+| RMI-DEPLOYFORGE-013 | Zone document and verification against the CDN, with planned records | done |
+| RMI-DEPLOYFORGE-014 | Zone hardening baseline as data: plan, apply, verify | done |
+| RMI-DEPLOYFORGE-015 | Origin certificates made on the host and signed by the CDN | done |
+| RMI-DEPLOYFORGE-016 | Static sites on edge workers, deployed from a tag and recorded | blocked: needs a public Cloudflare Workers upload client |
 
 ## Phase 4: Databases
 
 | ID | Item | Status |
 |---|---|---|
-| RMI-DEPLOYFORGE-017 | Owner and app roles per database with connection limits and SCRAM verifiers, passwords in the parameter store | planned |
-| RMI-DEPLOYFORGE-018 | Snapshots before a prod deploy and on demand | planned |
+| RMI-DEPLOYFORGE-017 | Owner and app roles per database with connection limits and SCRAM verifiers, passwords in the parameter store | done |
+| RMI-DEPLOYFORGE-018 | Snapshots before a prod deploy and on demand | done |
