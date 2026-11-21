@@ -8,6 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+
+	"github.com/plexusone/deployforge/dbroles"
 	"github.com/plexusone/deployforge/deploy/deployer"
 	"github.com/plexusone/deployforge/fleet"
 )
@@ -103,5 +106,68 @@ func TestCaddyfilePrintsAHostsLiveStacks(t *testing.T) {
 	}
 	if out, err := run(t, "caddyfile", "web-1", "--with", "example-app/staging"); err != nil || !strings.Contains(out, "stage-app.example.com {") {
 		t.Errorf("with: %v\n%s", err, out)
+	}
+}
+
+// memParams is a parameter store in memory.
+type memParams map[string]string
+
+func (m memParams) Get(_ context.Context, name string) (string, bool, error) {
+	v, ok := m[name]
+	return v, ok, nil
+}
+
+func (m memParams) Put(_ context.Context, name, value string) error {
+	m[name] = value
+	return nil
+}
+
+func TestDBRolesPlanShowsNoPasswordAndApplyNeedsConfirm(t *testing.T) {
+	dir := t.TempDir()
+	doc := `{
+  "formatVersion": "1",
+  "portRange": {"min": 8101, "max": 8199},
+  "hosts": [{"name": "web-1", "address": "203.0.113.10"}],
+  "databaseServer": {"endpoint": "db.internal", "adminUser": "admin", "adminDatabase": "fleet",
+    "adminPassword": {"parameter": "/fleet/db-admin"}, "via": "web-1"},
+  "apps": [{
+    "name": "example-app", "repo": "github.com/example/example-app", "secretPrefix": "/example/{stack}/example-app/",
+    "stacks": {"prod": {"host": "web-1", "hosts": ["app.example.com"], "port": 8101, "status": "live",
+      "limits": {"memoryMax": "512M", "cpuQuota": "50%", "connectionLimit": 10},
+      "databases": [{"name": "example", "appRole": true, "ownerDsn": "migrate/EXAMPLE_PG_ADMIN_DSN", "appDsn": "EXAMPLE_PG_DSN"}]}}
+  }]
+}`
+	path := dir + "/fleet.json"
+	if err := os.WriteFile(path, []byte(doc), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	params := memParams{"/fleet/db-admin": "adm1n"}
+	cmd := New(Options{Fleet: path, Params: func(*cobra.Command) (dbroles.Store, error) { return params, nil }})
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+	cmd.SetArgs([]string{"db", "roles", "plan", "example-app", "prod"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("%v\n%s", err, buf.String())
+	}
+	out := buf.String()
+	for _, want := range []string{"create /example/prod/example-app/migrate/EXAMPLE_PG_ADMIN_DSN", "create /example/prod/example-app/EXAMPLE_PG_DSN", "example_owner", "example_app"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("plan lacks %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "adm1n") || strings.Contains(out, "SCRAM-SHA-256$4096:") && !strings.Contains(out, "redacted") {
+		t.Errorf("the plan shows a secret:\n%s", out)
+	}
+	if len(params) != 1 {
+		t.Errorf("plan wrote parameters: %v", params)
+	}
+	buf.Reset()
+	cmd.SetArgs([]string{"db", "roles", "apply", "example-app", "prod"})
+	if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "--confirm") {
+		t.Errorf("apply without --confirm: %v", err)
+	}
+	if len(params) != 1 {
+		t.Errorf("apply without --confirm wrote parameters: %v", params)
 	}
 }

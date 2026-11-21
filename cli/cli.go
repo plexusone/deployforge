@@ -15,6 +15,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/plexusone/deployforge/dbroles"
 	"github.com/plexusone/deployforge/deploy/deployer"
 	"github.com/plexusone/deployforge/deploy/hooks"
 	"github.com/plexusone/deployforge/deploy/hostaddr"
@@ -40,6 +41,9 @@ type Options struct {
 	Store func(c *cobra.Command) (secrets.Store, error)
 	// Dial reaches hosts with an SSH key; the system's ssh and scp when nil.
 	Dial func(key string) deployer.Dialer
+	// Params opens the parameter store database provisioning reads and
+	// writes; AWS SSM Parameter Store when nil.
+	Params func(c *cobra.Command) (dbroles.Store, error)
 }
 
 // Environment variables the commands read.
@@ -68,6 +72,7 @@ func New(o Options) *cobra.Command {
 		hostCmd(load, dialer(o)),
 		caddyfileCmd(load),
 		caddyCmd(load, dialer(o)),
+		dbCmd(load, o),
 		releaseCmd(load),
 		deployCmd(load, &fleetPath, o),
 		ledgerCmd(load),
