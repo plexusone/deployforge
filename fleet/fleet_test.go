@@ -162,3 +162,20 @@ func TestLoopbackHostsAndLogFiles(t *testing.T) {
 		t.Errorf("a good value was refused: %v", err)
 	}
 }
+
+func TestEdge(t *testing.T) {
+	f := load(t)
+	f.Apps[0].Edge = Cloudflare
+	if err := f.Validate(); err != nil {
+		t.Errorf("cloudflare with a domain: %v", err)
+	}
+	f.Apps[0].Domain = ""
+	f.Apps[0].Stacks = map[string]Stack{"prod": {Host: "web-1", Hosts: []string{"app.example.org"}, Port: 8101, Status: Planned}}
+	if err := f.Validate(); err == nil || !strings.Contains(err.Error(), "needs its domain") {
+		t.Errorf("cloudflare without a domain: %v", err)
+	}
+	f.Apps[0].Edge = "akamai"
+	if err := f.Validate(); err == nil || !strings.Contains(err.Error(), `edge "akamai"`) {
+		t.Errorf("an unknown edge: %v", err)
+	}
+}

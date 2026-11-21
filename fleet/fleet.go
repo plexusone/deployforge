@@ -42,6 +42,9 @@ type Fleet struct {
 	PortRange PortRange `json:"portRange" jsonschema:"description=The range apps' loopback ports come from"`
 	// Hosts are the machines apps run on.
 	Hosts []Host `json:"hosts" jsonschema:"description=The machines apps run on,minItems=1"`
+	// ACMEEmail is the address Caddy registers with for the certificates it
+	// gets itself, for apps with no edge.
+	ACMEEmail string `json:"acmeEmail,omitempty" jsonschema:"description=The address Caddy registers with for certificates it gets itself\\, for apps with no edge"`
 	// Apps are the deployed apps.
 	Apps []App `json:"apps" jsonschema:"description=The deployed apps"`
 }
@@ -79,6 +82,11 @@ type App struct {
 	Repo string `json:"repo" jsonschema:"description=The repository that builds the binary\\, such as github.com/org/repo"`
 	// Domain, when set, is the DNS zone every host name of the app is in.
 	Domain string `json:"domain,omitempty" jsonschema:"description=The DNS zone every host name of the app is in"`
+	// Edge is what is in front of the app's host names. With cloudflare,
+	// the reverse proxy serves the zone's origin certificate and trusts
+	// Cloudflare's addresses to name the client; with none, the reverse
+	// proxy gets its own certificates.
+	Edge Edge `json:"edge,omitempty" jsonschema:"description=What is in front of the app's host names: cloudflare\\, or empty for none,enum=,enum=cloudflare"`
 	// SecretPrefix is where the app's secrets are in the parameter store,
 	// with {stack} for the stack's name, such as /example/{stack}/app/.
 	SecretPrefix string `json:"secretPrefix" jsonschema:"description=The app's secrets in the parameter store\\, with {stack} for the stack\\, such as /example/{stack}/app/"`
@@ -124,6 +132,19 @@ type Database struct {
 	Name    string `json:"name" jsonschema:"description=The database's name,pattern=^[a-z][a-z0-9_]*$"`
 	AppRole bool   `json:"appRole,omitempty" jsonschema:"description=Whether the app runs as a separate role with rows only\\, rather than as the owner"`
 }
+
+// Edge is what is in front of an app's host names.
+type Edge string
+
+// Edges.
+const (
+	// NoEdge means clients reach the host directly; the reverse proxy gets
+	// certificates itself.
+	NoEdge Edge = ""
+	// Cloudflare means Cloudflare's proxy is in front, with an origin
+	// certificate on the host for the app's domain.
+	Cloudflare Edge = "cloudflare"
+)
 
 // Status is where a stack runs.
 type Status string
@@ -314,6 +335,15 @@ func (f *Fleet) Validate() error {
 		}
 		if a.Domain != "" && !hostPattern.MatchString(a.Domain) {
 			bad(at, "domain %q must be a lowercase DNS name", a.Domain)
+		}
+		switch a.Edge {
+		case NoEdge:
+		case Cloudflare:
+			if a.Domain == "" {
+				bad(at, "an app behind cloudflare needs its domain, which names its origin certificate")
+			}
+		default:
+			bad(at, "edge %q must be cloudflare or empty", a.Edge)
 		}
 		if !strings.HasPrefix(a.SecretPrefix, "/") || !strings.HasSuffix(a.SecretPrefix, "/") || !strings.Contains(a.SecretPrefix, StackPlaceholder) {
 			bad(at, "secretPrefix must start and end with / and contain %s, such as /example/%s/%s/", StackPlaceholder, StackPlaceholder, a.Name)

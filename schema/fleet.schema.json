@@ -18,6 +18,14 @@
           "type": "string",
           "description": "The DNS zone every host name of the app is in"
         },
+        "edge": {
+          "type": "string",
+          "enum": [
+            "",
+            "cloudflare"
+          ],
+          "description": "What is in front of the app's host names: cloudflare, or empty for none"
+        },
         "secretPrefix": {
           "type": "string",
           "description": "The app's secrets in the parameter store, with {stack} for the stack, such as /example/{stack}/app/"
@@ -104,6 +112,10 @@
           "type": "array",
           "minItems": 1,
           "description": "The machines apps run on"
+        },
+        "acmeEmail": {
+          "type": "string",
+          "description": "The address Caddy registers with for certificates it gets itself, for apps with no edge"
         },
         "apps": {
           "items": {
