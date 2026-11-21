@@ -66,3 +66,42 @@ func TestHostSetupPrintsOrApplies(t *testing.T) {
 		t.Errorf("output = %q", buf.String())
 	}
 }
+
+func TestCaddyInstallValidatesFirstAndKeepsThePrevious(t *testing.T) {
+	tr := &fakeTransport{}
+	cmd := New(Options{Fleet: testFleet, Dial: func(string) deployer.Dialer {
+		return func(fleet.Host) (deployer.Transport, error) { return tr, nil }
+	}})
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+	cmd.SetArgs([]string{"caddy", "install", "web-1"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("%v\n%s", err, buf.String())
+	}
+	want := []string{
+		"upload /tmp/tmp.abc/Caddyfile",
+		"sudo caddy validate --config /tmp/tmp.abc/Caddyfile --adapter caddyfile",
+		"sudo test -f /etc/caddy/Caddyfile",
+		"sudo cp -p /etc/caddy/Caddyfile /etc/caddy/Caddyfile.previous",
+		"sudo install -o root -g root -m 0644 /tmp/tmp.abc/Caddyfile /etc/caddy/Caddyfile",
+		"sudo systemctl reload caddy",
+		"sudo rm -rf /tmp/tmp.abc",
+	}
+	if got := strings.Join(tr.calls, "\n"); got != strings.Join(want, "\n") {
+		t.Errorf("calls:\n%s", got)
+	}
+	if !strings.Contains(tr.script, "app.example.com, auth.example.com {") {
+		t.Errorf("uploaded Caddyfile:\n%s", tr.script)
+	}
+}
+
+func TestCaddyfilePrintsAHostsLiveStacks(t *testing.T) {
+	out, err := run(t, "caddyfile", "web-1")
+	if err != nil || !strings.Contains(out, "import app 8101") || strings.Contains(out, "stage-app") {
+		t.Errorf("%v\n%s", err, out)
+	}
+	if out, err := run(t, "caddyfile", "web-1", "--with", "example-app/staging"); err != nil || !strings.Contains(out, "stage-app.example.com {") {
+		t.Errorf("with: %v\n%s", err, out)
+	}
+}

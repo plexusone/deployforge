@@ -64,6 +64,8 @@ func New(o Options) *cobra.Command {
 		nextPortCmd(load),
 		unitCmd(load),
 		hostCmd(load, dialer(o)),
+		caddyfileCmd(load),
+		caddyCmd(load, dialer(o)),
 		releaseCmd(load),
 		deployCmd(load, &fleetPath, o),
 		ledgerCmd(load),
