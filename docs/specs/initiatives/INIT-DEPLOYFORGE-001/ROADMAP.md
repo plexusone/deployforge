@@ -8,22 +8,22 @@ Phases group the work; each phase's status follows from its items.
 
 | ID | Item | Status |
 |---|---|---|
-| RMI-DEPLOYFORGE-001 | Fleet document: types, named stacks, per-stack databases, port range, validation and generated schema | planned |
-| RMI-DEPLOYFORGE-002 | Release packaging from a clean, tagged, pushed checkout, with revision and checksum | planned |
-| RMI-DEPLOYFORGE-003 | Secrets: a stack's prefix as environment, migrate-only variables and key files, behind a `Store` interface with AWS SSM | planned |
-| RMI-DEPLOYFORGE-004 | On-host deploy: unpack, install with backup, validate, migrate, atomic switch, readiness per host name, restore, prune | planned |
-| RMI-DEPLOYFORGE-005 | Operator side: request, transfer over SSH, `deploy ship`, `release` and `rollback`, public readiness check, ledger | planned |
-| RMI-DEPLOYFORGE-006 | Deploy lock and on-host audit log, with `deploy unlock` | planned |
-| RMI-DEPLOYFORGE-007 | Hooks before and after each phase, with no secret values in their environment | planned |
+| RMI-DEPLOYFORGE-001 | Fleet document: types, named stacks, per-stack databases, port range, validation and generated schema | done |
+| RMI-DEPLOYFORGE-002 | Release packaging from a clean, tagged, pushed checkout, with revision and checksum | done |
+| RMI-DEPLOYFORGE-003 | Secrets: a stack's prefix as environment, migrate-only variables and key files, behind a `Store` interface with AWS SSM | done |
+| RMI-DEPLOYFORGE-004 | On-host deploy: unpack, install with backup, validate, migrate, atomic switch, readiness per host name, restore, prune | done |
+| RMI-DEPLOYFORGE-005 | Operator side: request, transfer over SSH, `deploy ship`, `release` and `rollback`, public readiness check, ledger | done |
+| RMI-DEPLOYFORGE-006 | Deploy lock and on-host audit log, with `deploy unlock` | done |
+| RMI-DEPLOYFORGE-007 | Hooks around packaging, deploy and rollback, and on failure, with no secret values in their environment | done |
 
 ## Phase 2: The host around the apps
 
 | ID | Item | Status |
 |---|---|---|
-| RMI-DEPLOYFORGE-008 | systemd units with sandbox and resource limits | planned |
+| RMI-DEPLOYFORGE-008 | systemd units with sandbox and resource limits | done |
 | RMI-DEPLOYFORGE-009 | Idempotent host setup per app stack | planned |
 | RMI-DEPLOYFORGE-010 | Caddyfile from the fleet document, validated on the host and reloaded | planned |
-| RMI-DEPLOYFORGE-011 | Port allocation from the configured range, `next-port` | planned |
+| RMI-DEPLOYFORGE-011 | Port allocation from the configured range, `next-port` | done |
 | RMI-DEPLOYFORGE-012 | Host addresses from a provisioning tool's outputs, Pulumi first | planned |
 
 ## Phase 3: The edge

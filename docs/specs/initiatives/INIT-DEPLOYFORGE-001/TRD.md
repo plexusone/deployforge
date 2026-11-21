@@ -73,7 +73,7 @@ types with `invopop/jsonschema` and embedded.
 ```json
 {
   "formatVersion": "1",
-  "hosts": [{ "name": "web-1", "address": "{{output:staticIp}}", "sshUser": "ubuntu" }],
+  "hosts": [{ "name": "web-1", "address": "203.0.113.10", "sshUser": "ubuntu" }],
   "portRange": { "min": 8101, "max": 8199 },
   "apps": [{
     "name": "example-app",
@@ -87,8 +87,8 @@ types with `invopop/jsonschema` and embedded.
         "host": "web-1",
         "hosts": ["app.example.com", "auth.example.com"],
         "port": 8101,
-        "databases": [{ "name": "example", "roles": "owner-and-app" }],
-        "status": "shared",
+        "databases": [{ "name": "example", "appRole": true }],
+        "status": "live",
         "limits": { "memoryMax": "512M", "cpuQuota": "50%", "connectionLimit": 10 }
       }
     }
@@ -99,10 +99,12 @@ types with `invopop/jsonschema` and embedded.
 - **Stacks are named, not fixed.** Any number of stacks per app; the unit
   is the app's name for the stack named `prod` (configurable) and
   `<app>-<stack>` otherwise.
-- **Databases belong to the stack,** with whether each has an owner and an
-  app role; nothing about databases is compiled in.
+- **Databases belong to the stack,** each saying whether the app runs as
+  a separate app role (`appRole`) or as the owner; nothing about databases
+  is compiled in.
 - **Addresses can come from outputs** of the tool that made the hosts,
-  read through a provider (Pulumi first), so the document holds no IPs.
+  read through a provider (Pulumi first), so the document holds no IPs
+  (RMI-DEPLOYFORGE-012; until then an address is an IP or host name).
 
 ### Per-app files
 
