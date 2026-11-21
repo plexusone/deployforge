@@ -1,5 +1,5 @@
-// Package schema holds the fleet document's JSON Schema, generated from the
-// Go types in package fleet.
+// Package schema holds the JSON Schemas of the fleet document and the zones
+// document, generated from the Go types in packages fleet and zones.
 //
 // Regenerate it after changing the types:
 //
@@ -21,14 +21,23 @@ import (
 // FleetID is the fleet document schema's ID.
 const FleetID = "https://github.com/plexusone/deployforge/schema/fleet.schema.json"
 
-// FleetFile is the schema's file name, relative to this package's directory.
-const FleetFile = "fleet.schema.json"
+// File names, relative to this package's directory.
+const (
+	FleetFile = "fleet.schema.json"
+	ZonesFile = "zones.schema.json"
+)
 
 //go:embed fleet.schema.json
 var fleetSchema []byte
 
+//go:embed zones.schema.json
+var zonesSchema []byte
+
 // Fleet returns the fleet document's JSON Schema.
 func Fleet() []byte { return fleetSchema }
+
+// Zones returns the zones document's JSON Schema.
+func Zones() []byte { return zonesSchema }
 
 // Generate builds the fleet document's schema from the Go types.
 func Generate() ([]byte, error) {

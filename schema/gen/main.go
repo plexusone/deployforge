@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/plexusone/deployforge/schema"
+	"github.com/plexusone/deployforge/zones"
 )
 
 func main() {
@@ -21,6 +22,13 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	// The schema is committed and read by editors.
-	return os.WriteFile(schema.FleetFile, data, 0o644) //nolint:gosec // G306: a public schema file
+	// The schemas are committed and read by editors.
+	if err := os.WriteFile(schema.FleetFile, data, 0o644); err != nil { //nolint:gosec // G306: a public schema file
+		return err
+	}
+	z, err := zones.JSONSchema()
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(schema.ZonesFile, z, 0o644) //nolint:gosec // G306: a public schema file
 }

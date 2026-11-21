@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/plexusone/deployforge/schema/zones.schema.json",
+  "$ref": "#/$defs/Document",
+  "$defs": {
+    "Document": {
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "The JSON Schema this file follows, for editors"
+        },
+        "formatVersion": {
+          "type": "string",
+          "enum": [
+            "1"
+          ],
+          "description": "Version of the zones.json format the file follows"
+        },
+        "zones": {
+          "items": {
+            "$ref": "#/$defs/Zone"
+          },
+          "type": "array",
+          "description": "Every DNS zone the fleet owns"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "formatVersion",
+        "zones"
+      ]
+    },
+    "HTTPCheck": {
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^/",
+          "description": "The path requested"
+        },
+        "status": {
+          "type": "integer",
+          "description": "The status it must answer"
+        },
+        "location": {
+          "type": "string",
+          "description": "What a redirect's Location must start with"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "path",
+        "status"
+      ]
+    },
+    "Hardening": {
+      "properties": {
+        "allowCountries": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "The only countries allowed on countryHosts, as ISO 3166-1 alpha-2 codes"
+        },
+        "countryHosts": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "Labels under the zone that allowCountries applies to, such as app and auth"
+        },
+        "botFightModeOff": {
+          "type": "boolean",
+          "description": "Turn Bot Fight Mode off, which challenges visitors with a script"
+        },
+        "wwwRedirect": {
+          "type": "boolean",
+          "description": "Redirect www to the apex, 301, keeping the path and query"
+        },
+        "rateLimit": {
+          "$ref": "#/$defs/RateLimit",
+          "description": "A limit on requests to one path per client address, such as a sign-in endpoint"
+        },
+        "noCachePrefixes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "Path prefixes never cached, such as /api/, besides / and .html documents"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "RateLimit": {
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^/",
+          "description": "The exact request path limited, such as /login-token"
+        },
+        "requests": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Requests one address may make in 10 seconds; default 5"
+        },
+        "whenRecord": {
+          "type": "string",
+          "description": "A record label that must be present before the limit applies, such as auth"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "path"
+      ]
+    },
+    "Record": {
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^(@|[a-z0-9_]([a-z0-9_-]*[a-z0-9])?(\\.[a-z0-9_]([a-z0-9_-]*[a-z0-9])?)*)$",
+          "description": "The label under the zone, or @ for the zone itself"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "A",
+            "AAAA",
+            "CNAME",
+            "MX",
+            "TXT",
+            "WORKER"
+          ],
+          "description": "The record type"
+        },
+        "values": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "The values; for a proxied record, the origin, which only Cloudflare sees; an MX value is the priority and host"
+        },
+        "proxied": {
+          "type": "boolean",
+          "description": "Whether Cloudflare proxies the record and answers with its own addresses"
+        },
+        "purpose": {
+          "type": "string",
+          "enum": [
+            "static-site",
+            "app",
+            "redirect",
+            "mail",
+            "verification",
+            "parked"
+          ],
+          "description": "What the record is for"
+        },
+        "source": {
+          "type": "string",
+          "description": "Where what it serves comes from: a static site's repository or the fleet's app/stack"
+        },
+        "host": {
+          "type": "string",
+          "description": "What serves it, such as github-pages or the fleet host's name"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "present",
+            "planned"
+          ],
+          "description": "Whether it should exist now; planned records are skipped by verify"
+        },
+        "check": {
+          "$ref": "#/$defs/HTTPCheck",
+          "description": "An HTTPS request to the host that must answer as given"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Anything else to know about the record"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "type",
+        "values",
+        "purpose"
+      ]
+    },
+    "Zone": {
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)+$",
+          "description": "The domain"
+        },
+        "registrar": {
+          "type": "string",
+          "description": "Where the domain is registered"
+        },
+        "dns": {
+          "type": "string",
+          "enum": [
+            "cloudflare",
+            "registrar"
+          ],
+          "description": "Who answers for the zone"
+        },
+        "records": {
+          "items": {
+            "$ref": "#/$defs/Record"
+          },
+          "type": "array",
+          "description": "Every record of the zone, one entry per name and type"
+        },
+        "hardening": {
+          "$ref": "#/$defs/Hardening",
+          "description": "The zone's settings for the security baseline deployforge zones harden applies"
+        },
+        "notes": {
+          "type": "string",
+          "description": "What a reader changing the zone must know"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "registrar",
+        "dns",
+        "records"
+      ]
+    }
+  },
+  "title": "DNS zones",
+  "description": "Every DNS zone the fleet owns, each record and what it serves."
+}

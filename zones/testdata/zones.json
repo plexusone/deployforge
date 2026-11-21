@@ -1,0 +1,21 @@
+{
+  "formatVersion": "1",
+  "zones": [
+    {
+      "name": "example.com",
+      "registrar": "example-registrar",
+      "dns": "cloudflare",
+      "records": [
+        { "name": "@", "type": "A", "values": ["192.0.2.1"], "proxied": true, "purpose": "static-site", "source": "github.com/example/www" },
+        { "name": "app", "type": "A", "values": ["203.0.113.10"], "proxied": true, "purpose": "app", "source": "example-app/prod", "host": "web-1" },
+        { "name": "auth", "type": "A", "values": ["203.0.113.10"], "proxied": true, "purpose": "app", "source": "example-app/prod", "host": "web-1" },
+        { "name": "stage-app", "type": "A", "values": ["203.0.113.10"], "proxied": true, "purpose": "app", "source": "example-app/staging", "host": "web-1", "status": "planned" }
+      ],
+      "hardening": {
+        "wwwRedirect": true,
+        "rateLimit": { "path": "/login-token", "whenRecord": "auth" },
+        "noCachePrefixes": ["/api/"]
+      }
+    }
+  ]
+}
