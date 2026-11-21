@@ -139,7 +139,7 @@ func TestASelfCheckRequestIsChecked(t *testing.T) {
 			t.Errorf("%s was accepted", name)
 		}
 	}
-	rb := Request{Action: ActionRollback, Target: tgt, HealthTimeout: 3, Keep: 2, Selfcheck: &SelfcheckRequest{Mode: SelfcheckEnforce, Properties: sandbox}}
+	rb := Request{Action: ActionRollback, Target: tgt, Operator: "tester", HealthTimeout: 3, Keep: 2, Selfcheck: &SelfcheckRequest{Mode: SelfcheckEnforce, Properties: sandbox}}
 	if err := rb.Validate(); err == nil {
 		t.Error("a rollback with a self-check was accepted")
 	}

@@ -121,8 +121,8 @@ func (d *Deployer) check() error {
 	if d.Keep < 2 {
 		return fmt.Errorf("deployer: releases to keep, %d, must be at least 2", d.Keep)
 	}
-	if strings.TrimSpace(d.Operator) == "" {
-		return errors.New("deployer: say who is deploying")
+	if !onhost.ValidOperator(d.Operator) {
+		return fmt.Errorf("deployer: say who is deploying, as 1 to 64 letters, digits and . _ @ -, not %q", d.Operator)
 	}
 	if err := release.CheckLinuxBinary(d.HostBinary); err != nil {
 		return fmt.Errorf("deployer: the host runs %s: %w (build deployforge for linux/amd64)", d.HostBinary, err)
@@ -194,7 +194,7 @@ func (d *Deployer) Release(ctx context.Context, o ReleaseOptions) (ledger.Entry,
 	d.logf("%d variables, %d migrate variables and %d files", len(bundle.Env), len(bundle.Migrate), len(bundle.Files))
 
 	req := onhost.Request{
-		Action: onhost.ActionRelease, Target: t, ReleaseID: id, Config: config, Secrets: bundle,
+		Action: onhost.ActionRelease, Target: t, Operator: d.Operator, ReleaseID: id, Config: config, Secrets: bundle,
 		HealthTimeout: d.HealthTimeout, Keep: d.Keep,
 	}
 	if req.Selfcheck, err = d.selfcheck(o); err != nil {
@@ -252,7 +252,7 @@ func (d *Deployer) Rollback(ctx context.Context, app, stack string) (ledger.Entr
 	if err != nil {
 		return ledger.Entry{}, err
 	}
-	req := onhost.Request{Action: onhost.ActionRollback, Target: t, HealthTimeout: d.HealthTimeout, Keep: d.Keep}
+	req := onhost.Request{Action: onhost.ActionRollback, Target: t, Operator: d.Operator, HealthTimeout: d.HealthTimeout, Keep: d.Keep}
 	res, err := d.run(ctx, t, req, "")
 	if err != nil {
 		return ledger.Entry{}, err
@@ -266,6 +266,24 @@ func (d *Deployer) Rollback(ctx context.Context, app, stack string) (ledger.Entr
 		Revision: rev, Previous: res.Previous, Operator: d.Operator,
 	}
 	return e, d.record(e)
+}
+
+// Unlock removes a stack's stale deploy lock, left by a deploy that was cut
+// off. It changes nothing else and records nothing in the ledger; the host's
+// audit log records it.
+func (d *Deployer) Unlock(ctx context.Context, app, stack string) error {
+	if err := d.check(); err != nil {
+		return err
+	}
+	t, err := target.Resolve(d.Fleet, app, stack)
+	if err != nil {
+		return err
+	}
+	if _, err := d.run(ctx, t, onhost.Request{Action: onhost.ActionUnlock, Target: t, Operator: d.Operator}, ""); err != nil {
+		return err
+	}
+	d.logf("unlocked %s/%s", t.App, t.Stack)
+	return nil
 }
 
 // run uploads deployforge's linux build (and the archive) to the target's

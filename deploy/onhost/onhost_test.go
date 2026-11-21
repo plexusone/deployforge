@@ -26,10 +26,12 @@ var tgt = target.Target{
 // fakeSys records what a deploy asks of systemd and answers health probes for
 // the release current points at.
 type fakeSys struct {
-	root      string
-	calls     []string
-	fail      map[string]bool // "validate" or "migrate"
-	unhealthy map[string]bool // release names that never become ready
+	root  string
+	calls []string
+	fail  map[string]bool // "validate" or "migrate"
+	// failMessage, when set, is the error a failing step returns.
+	failMessage string
+	unhealthy   map[string]bool // release names that never become ready
 	// migrateEnv is the migrate environment file's contents when migrate ran.
 	migrateEnv string
 	owned      []string
@@ -76,6 +78,9 @@ func (s *fakeSys) RunAs(_ context.Context, user string, envFiles, argv []string,
 		s.migrateEnv = string(data)
 	}
 	if s.fail[step] {
+		if s.failMessage != "" {
+			return errors.New(s.failMessage)
+		}
 		return errors.New("exit status 1")
 	}
 	return nil
@@ -164,7 +169,7 @@ func request(id string, files ...string) Request {
 		b.Files = append(b.Files, secrets.File{Name: f, Data: []byte(f + " for " + id + "\n")})
 	}
 	return Request{
-		Action: ActionRelease, Target: tgt, ReleaseID: id, Config: []byte("config for " + id + "\n"),
+		Action: ActionRelease, Target: tgt, Operator: "tester", ReleaseID: id, Config: []byte("config for " + id + "\n"),
 		Secrets: b, HealthTimeout: 3, Keep: 2,
 	}
 }
@@ -351,7 +356,7 @@ func TestARollbackSwitchesToTheReleaseBeforeTheCurrentOne(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	rb := Request{Action: ActionRollback, Target: tgt, HealthTimeout: 3, Keep: 2}
+	rb := Request{Action: ActionRollback, Target: tgt, Operator: "tester", HealthTimeout: 3, Keep: 2}
 	res, err := r.host.Run(context.Background(), rb, "")
 	if err != nil {
 		t.Fatal(err)
@@ -376,18 +381,18 @@ func TestAnUnhealthyRollbackRestoresTheCurrentRelease(t *testing.T) {
 		}
 	}
 	r.sys.unhealthy[idA] = true
-	_, err := r.host.Run(context.Background(), Request{Action: ActionRollback, Target: tgt, HealthTimeout: 3, Keep: 2}, "")
+	_, err := r.host.Run(context.Background(), Request{Action: ActionRollback, Target: tgt, Operator: "tester", HealthTimeout: 3, Keep: 2}, "")
 	if err == nil {
 		t.Fatal("an unhealthy rollback succeeded")
 	}
 	if r.sys.live() != idB {
 		t.Errorf("current = %s, want %s restored", r.sys.live(), idB)
 	}
-	if _, err := r.host.Run(context.Background(), Request{Action: ActionRollback, Target: tgt, HealthTimeout: 3, Keep: 2}, ""); err == nil {
+	if _, err := r.host.Run(context.Background(), Request{Action: ActionRollback, Target: tgt, Operator: "tester", HealthTimeout: 3, Keep: 2}, ""); err == nil {
 		t.Error("a second unhealthy rollback succeeded")
 	}
 	empty := newRig(t)
-	if _, err := empty.host.Run(context.Background(), Request{Action: ActionRollback, Target: tgt, HealthTimeout: 3, Keep: 2}, ""); err == nil || !strings.Contains(err.Error(), "no current release") {
+	if _, err := empty.host.Run(context.Background(), Request{Action: ActionRollback, Target: tgt, Operator: "tester", HealthTimeout: 3, Keep: 2}, ""); err == nil || !strings.Contains(err.Error(), "no current release") {
 		t.Errorf("a stack never deployed: %v", err)
 	}
 }

@@ -35,12 +35,16 @@ import (
 const (
 	ActionRelease  = "release"
 	ActionRollback = "rollback"
+	// ActionUnlock removes a stale deploy lock and changes nothing else.
+	ActionUnlock = "unlock"
 )
 
 // Request is what the operator's side sends, as JSON on standard input.
 type Request struct {
 	Action string        `json:"action"`
 	Target target.Target `json:"target"`
+	// Operator is who is deploying, for the lock and the audit log.
+	Operator string `json:"operator"`
 	// ReleaseID names the new release directory: <UTC timestamp>-<revision>.
 	ReleaseID string `json:"releaseId,omitempty"`
 	// Config is the stack's config.yaml.
@@ -95,12 +99,24 @@ type Result struct {
 var (
 	releaseID = regexp.MustCompile(`^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{7,40}$`)
 	property  = regexp.MustCompile(`^[A-Z][A-Za-z]+=[^\x00-\x1f]*$`)
+	// operatorName is who is deploying, written to the lock and the audit log.
+	operatorName = regexp.MustCompile(`^[A-Za-z0-9._@-]{1,64}$`)
 )
+
+// ValidOperator reports whether name can be recorded as who is deploying:
+// 1 to 64 letters, digits and . _ @ -.
+func ValidOperator(name string) bool { return operatorName.MatchString(name) }
 
 // Validate checks a request before anything on the host changes.
 func (r Request) Validate() error {
 	if err := r.Target.Validate(); err != nil {
 		return err
+	}
+	if !operatorName.MatchString(r.Operator) {
+		return fmt.Errorf("onhost: operator %q must be 1 to 64 letters, digits and . _ @ -", r.Operator)
+	}
+	if r.Action == ActionUnlock {
+		return nil
 	}
 	if r.HealthTimeout < 1 || r.HealthTimeout > 600 {
 		return fmt.Errorf("onhost: health timeout %d must be 1 to 600 seconds", r.HealthTimeout)
@@ -137,7 +153,7 @@ func (r Request) Validate() error {
 			return errors.New("onhost: a rollback runs no self-check")
 		}
 	default:
-		return fmt.Errorf("onhost: action %q must be %s or %s", r.Action, ActionRelease, ActionRollback)
+		return fmt.Errorf("onhost: action %q must be %s, %s or %s", r.Action, ActionRelease, ActionRollback, ActionUnlock)
 	}
 	return nil
 }
@@ -175,6 +191,8 @@ type Host struct {
 	Log io.Writer
 	// Sleep waits between health probes; time.Sleep when nil.
 	Sleep func(time.Duration)
+	// Now is the clock for the lock and the audit log; time.Now when nil.
+	Now func() time.Time
 }
 
 func (h *Host) logf(format string, a ...any) {
@@ -213,10 +231,37 @@ func (h *Host) layout(t target.Target) layout {
 
 // Run carries out a request. work is the directory the operator uploaded to;
 // a release's archive is work/release.tgz.
-func (h *Host) Run(ctx context.Context, r Request, work string) (Result, error) {
+//
+// A release or rollback holds the stack's deploy lock while it runs, and
+// every request, an unlock included, is appended to the stack's audit log.
+func (h *Host) Run(ctx context.Context, r Request, work string) (res Result, err error) {
 	if err := r.Validate(); err != nil {
 		return Result{}, err
 	}
+	l := h.layout(r.Target)
+	defer func() {
+		// A request refused for a held lock changed nothing, but who tried is
+		// worth knowing too.
+		if aerr := h.audit(l, r, res, err); aerr != nil {
+			// The change itself is done or reported; a lost audit line must
+			// not turn a live release into a reported failure.
+			h.logf("warning: %v", aerr)
+		}
+	}()
+	if r.Action == ActionUnlock {
+		return Result{}, h.unlock(l)
+	}
+	release, err := h.lock(l, r)
+	if err != nil {
+		return Result{}, err
+	}
+	defer func() {
+		if uerr := release(); uerr != nil {
+			// The release or rollback is done or reported; the stale lock
+			// only blocks the next deploy, which says how to unlock it.
+			h.logf("warning: %v; unlock the stack before the next deploy", uerr)
+		}
+	}()
 	if r.Action == ActionRollback {
 		return h.rollback(ctx, r)
 	}

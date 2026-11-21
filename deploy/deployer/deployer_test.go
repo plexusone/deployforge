@@ -464,3 +464,25 @@ func TestAnAppsSelfCheckReachesTheLedgerOnlyWhenTurnedOn(t *testing.T) {
 		t.Error("an unknown self-check mode was accepted")
 	}
 }
+
+func TestUnlockClearsAStaleLock(t *testing.T) {
+	r := newRig(t)
+	lock := filepath.Join(r.tr.sys.root, "opt", "one-cloud", "deploy.lock")
+	if err := os.WriteFile(lock, []byte(`{"operator":"alice","action":"release","since":"2026-10-23T18:00:00Z","pid":1}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// The host's reason reaches the operator on the log, as every on-host
+	// error does.
+	if _, err := r.d.Release(context.Background(), r.opts()); err == nil || !strings.Contains(r.log.String(), "unlock the stack") {
+		t.Fatalf("a locked stack deployed: %v\n%s", err, r.log.String())
+	}
+	if err := r.d.Unlock(context.Background(), "one-cloud", "prod"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.d.Release(context.Background(), r.opts()); err != nil {
+		t.Fatalf("after unlock: %v\n%s", err, r.log.String())
+	}
+	if got := r.ledger(); len(got) != 1 {
+		t.Errorf("an unlock reached the ledger: %+v", got)
+	}
+}
