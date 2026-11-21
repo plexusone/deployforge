@@ -163,6 +163,20 @@ func (f *Fleet) App(name string) (App, bool) {
 	return f.Apps[i], true
 }
 
+// Stack returns an app and one of its stacks, or an error naming what the
+// document lacks.
+func (f *Fleet) Stack(app, stack string) (App, Stack, error) {
+	a, ok := f.App(app)
+	if !ok {
+		return App{}, Stack{}, fmt.Errorf("fleet: no app %q", app)
+	}
+	s, ok := a.Stacks[stack]
+	if !ok {
+		return App{}, Stack{}, fmt.Errorf("fleet: app %s has no stack %q", app, stack)
+	}
+	return a, s, nil
+}
+
 // StackNames are the app's stacks, the primary first, then by name.
 func (f *Fleet) StackNames(a App) []string {
 	names := make([]string, 0, len(a.Stacks))

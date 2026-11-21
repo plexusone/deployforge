@@ -133,3 +133,15 @@ func TestNextPortFull(t *testing.T) {
 		t.Error("a full range gave a port")
 	}
 }
+
+func TestStack(t *testing.T) {
+	f := load(t)
+	if a, s, err := f.Stack("example-app", "staging"); err != nil || a.Name != "example-app" || s.Port != 8102 {
+		t.Errorf("Stack = %v, %+v, %v", a.Name, s, err)
+	}
+	for _, c := range [][2]string{{"other", "prod"}, {"example-app", "qa"}} {
+		if _, _, err := f.Stack(c[0], c[1]); err == nil {
+			t.Errorf("%s/%s resolved", c[0], c[1])
+		}
+	}
+}
