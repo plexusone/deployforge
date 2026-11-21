@@ -3,6 +3,16 @@
   "$id": "https://github.com/plexusone/deployforge/schema/fleet.schema.json",
   "$ref": "#/$defs/Fleet",
   "$defs": {
+    "AddressSource": {
+      "properties": {
+        "pulumi": {
+          "$ref": "#/$defs/PulumiOutput",
+          "description": "A Pulumi stack output"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "App": {
       "properties": {
         "name": {
@@ -143,7 +153,11 @@
         },
         "address": {
           "type": "string",
-          "description": "The host's address for SSH, or a reference resolved at deploy time"
+          "description": "The host's address for SSH; give it or addressFrom"
+        },
+        "addressFrom": {
+          "$ref": "#/$defs/AddressSource",
+          "description": "Where to read the host's address when it is used, such as a Pulumi stack output"
         },
         "sshUser": {
           "type": "string",
@@ -153,8 +167,7 @@
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "name",
-        "address"
+        "name"
       ]
     },
     "Limits": {
@@ -203,6 +216,29 @@
       "required": [
         "min",
         "max"
+      ]
+    },
+    "PulumiOutput": {
+      "properties": {
+        "dir": {
+          "type": "string",
+          "description": "The Pulumi project's directory"
+        },
+        "stack": {
+          "type": "string",
+          "description": "The Pulumi stack"
+        },
+        "output": {
+          "type": "string",
+          "description": "The output holding the address, such as staticIp"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "dir",
+        "stack",
+        "output"
       ]
     },
     "Stack": {

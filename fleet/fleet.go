@@ -59,11 +59,30 @@ type PortRange struct {
 type Host struct {
 	// Name is how stacks refer to the host.
 	Name string `json:"name" jsonschema:"description=How stacks refer to the host,pattern=^[a-z][a-z0-9-]*[a-z0-9]$"`
-	// Address is the host's address for SSH, or a reference resolved at
-	// deploy time, such as an output of the tool that made the host.
-	Address string `json:"address" jsonschema:"description=The host's address for SSH\\, or a reference resolved at deploy time"`
+	// Address is the host's address for SSH. Give it or AddressFrom.
+	Address string `json:"address,omitempty" jsonschema:"description=The host's address for SSH; give it or addressFrom"`
+	// AddressFrom reads the address, when it is used, from the tool that
+	// made the host, so the document holds no address.
+	AddressFrom *AddressSource `json:"addressFrom,omitempty" jsonschema:"description=Where to read the host's address when it is used\\, such as a Pulumi stack output"`
 	// SSHUser is the user deployforge connects as; it needs sudo.
 	SSHUser string `json:"sshUser,omitempty" jsonschema:"description=The user to connect as over SSH\\, with sudo; ubuntu when empty"`
+}
+
+// AddressSource names where a host's address is read from.
+type AddressSource struct {
+	// Pulumi is a Pulumi stack output.
+	Pulumi *PulumiOutput `json:"pulumi,omitempty" jsonschema:"description=A Pulumi stack output"`
+}
+
+// PulumiOutput is one output of a Pulumi stack.
+type PulumiOutput struct {
+	// Dir is the Pulumi project's directory, relative to the fleet
+	// document's working directory.
+	Dir string `json:"dir" jsonschema:"description=The Pulumi project's directory"`
+	// Stack is the stack's name.
+	Stack string `json:"stack" jsonschema:"description=The Pulumi stack"`
+	// Output is the output holding the address, such as staticIp.
+	Output string `json:"output" jsonschema:"description=The output holding the address\\, such as staticIp"`
 }
 
 // DefaultSSHUser is the user deployforge connects as when a host names none.
@@ -273,6 +292,7 @@ var (
 	hostPattern   = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z][a-z0-9-]*[a-z0-9]$`)
 	dbPattern     = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 	logPattern    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
+	pulumiName    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]*$`)
 	memoryPattern = regexp.MustCompile(`^[1-9][0-9]*[KMG]$`)
 	cpuPattern    = regexp.MustCompile(`^[1-9][0-9]*%$`)
 )
@@ -311,8 +331,18 @@ func (f *Fleet) Validate() error {
 			bad(at, "name is used by another host")
 		}
 		hostNames[h.Name] = true
-		if strings.TrimSpace(h.Address) == "" {
-			bad(at, "needs an address")
+		switch {
+		case h.AddressFrom == nil && strings.TrimSpace(h.Address) == "":
+			bad(at, "needs an address or addressFrom")
+		case h.AddressFrom != nil && h.Address != "":
+			bad(at, "give an address or addressFrom, not both")
+		case h.AddressFrom != nil:
+			p := h.AddressFrom.Pulumi
+			if p == nil {
+				bad(at, "addressFrom names no source")
+			} else if !pulumiName.MatchString(p.Stack) || !pulumiName.MatchString(p.Output) || strings.TrimSpace(p.Dir) == "" || strings.HasPrefix(p.Dir, "-") {
+				bad(at, "addressFrom.pulumi needs a dir, and a stack and an output of letters, digits and . _ / -")
+			}
 		}
 	}
 	if len(f.Hosts) == 0 {

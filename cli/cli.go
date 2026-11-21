@@ -4,6 +4,7 @@ package cli
 
 import (
 	"cmp"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/plexusone/deployforge/deploy/deployer"
 	"github.com/plexusone/deployforge/deploy/hooks"
+	"github.com/plexusone/deployforge/deploy/hostaddr"
 	"github.com/plexusone/deployforge/deploy/onhost"
 	"github.com/plexusone/deployforge/deploy/secrets"
 	"github.com/plexusone/deployforge/deploy/secrets/awsssm"
@@ -74,12 +76,24 @@ func New(o Options) *cobra.Command {
 	return root
 }
 
-// dialer is the option's dialer, or the system's ssh and scp.
+// dialer is the option's dialer, or the system's ssh and scp, reaching a
+// host at its resolved address: read from its source, such as a Pulumi
+// output, when the fleet document gives none.
 func dialer(o Options) func(key string) deployer.Dialer {
-	if o.Dial != nil {
-		return o.Dial
+	base := o.Dial
+	if base == nil {
+		base = deployer.SSHDialer
 	}
-	return deployer.SSHDialer
+	return func(key string) deployer.Dialer {
+		dial := base(key)
+		return func(h fleet.Host) (deployer.Transport, error) {
+			resolved, err := hostaddr.Resolve(context.Background(), h, nil)
+			if err != nil {
+				return nil, err
+			}
+			return dial(resolved)
+		}
+	}
 }
 
 func validateCmd(load func() (*fleet.Fleet, error)) *cobra.Command {
@@ -252,7 +266,7 @@ Environment:
 			return nil, err
 		}
 		return &deployer.Deployer{
-			Fleet: f, LedgerDir: ledgerDir, Dial: deployer.SSHDialer(sshKey), HostBinary: hostBinary,
+			Fleet: f, LedgerDir: ledgerDir, Dial: dialer(o)(sshKey), HostBinary: hostBinary,
 			Operator: operator, HealthTimeout: healthTimeout, Keep: keep, Log: c.ErrOrStderr(),
 			Hooks: &hooks.Runner{Dir: hooksDir, Out: c.ErrOrStderr()},
 		}, nil

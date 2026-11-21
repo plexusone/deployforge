@@ -179,3 +179,23 @@ func TestEdge(t *testing.T) {
 		t.Errorf("an unknown edge: %v", err)
 	}
 }
+
+func TestAddressFrom(t *testing.T) {
+	f := load(t)
+	f.Hosts[0] = Host{Name: "web-1", AddressFrom: &AddressSource{Pulumi: &PulumiOutput{Dir: "stack", Stack: "prod", Output: "staticIp"}}}
+	if err := f.Validate(); err != nil {
+		t.Errorf("pulumi: %v", err)
+	}
+	f.Hosts[0].Address = "203.0.113.10"
+	if err := f.Validate(); err == nil || !strings.Contains(err.Error(), "not both") {
+		t.Errorf("both: %v", err)
+	}
+	f.Hosts[0] = Host{Name: "web-1", AddressFrom: &AddressSource{Pulumi: &PulumiOutput{Dir: "stack", Stack: "prod; rm", Output: "staticIp"}}}
+	if err := f.Validate(); err == nil || !strings.Contains(err.Error(), "addressFrom.pulumi") {
+		t.Errorf("a bad stack name: %v", err)
+	}
+	f.Hosts[0] = Host{Name: "web-1"}
+	if err := f.Validate(); err == nil || !strings.Contains(err.Error(), "needs an address") {
+		t.Errorf("none: %v", err)
+	}
+}
