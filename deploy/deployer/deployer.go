@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/plexusone/deployforge/deploy/archive"
+	"github.com/plexusone/deployforge/deploy/hooks"
 	"github.com/plexusone/deployforge/deploy/onhost"
 	"github.com/plexusone/deployforge/deploy/secrets"
 	"github.com/plexusone/deployforge/deploy/systemd"
@@ -63,6 +64,9 @@ type Deployer struct {
 	Keep int
 	// Now is the clock; time.Now when nil.
 	Now func() time.Time
+	// Hooks runs the operator's hooks around a release or rollback; none
+	// when nil.
+	Hooks *hooks.Runner
 	// Log receives progress, the host's included.
 	Log io.Writer
 }
@@ -185,6 +189,23 @@ func (d *Deployer) Release(ctx context.Context, o ReleaseOptions) (ledger.Entry,
 	}
 	id := d.now().Format("20060102T150405Z") + "-" + checked.Revision
 	d.logf("%s/%s on %s: %s (previous: %s)", t.App, t.Stack, t.Host, id, orNone(previous))
+	facts := hooks.Facts{App: t.App, Stack: t.Stack, Host: t.Host, Operator: d.Operator, Release: id, Revision: checked.Revision, Tag: o.Tag}
+	if err := d.Hooks.Run(ctx, hooks.BeforeDeploy, facts); err != nil {
+		return ledger.Entry{}, err
+	}
+	e, err := d.release(ctx, t, o, id, previous, config, checked)
+	if err != nil {
+		d.failed(ctx, facts, err)
+		return e, err
+	}
+	if err := d.Hooks.Run(ctx, hooks.AfterDeploy, facts); err != nil {
+		return e, fmt.Errorf("deployer: %s/%s runs %s and it is recorded, but %w", t.App, t.Stack, e.Release, err)
+	}
+	return e, nil
+}
+
+// release reads the secrets, runs the release on the host and records it.
+func (d *Deployer) release(ctx context.Context, t target.Target, o ReleaseOptions, id, previous string, config []byte, checked archive.Checked) (ledger.Entry, error) {
 
 	d.logf("reading secrets from %s", t.SecretPrefix)
 	bundle, err := secrets.Load(ctx, d.Store, t.SecretPrefix)
@@ -252,6 +273,24 @@ func (d *Deployer) Rollback(ctx context.Context, app, stack string) (ledger.Entr
 	if err != nil {
 		return ledger.Entry{}, err
 	}
+	facts := hooks.Facts{App: t.App, Stack: t.Stack, Host: t.Host, Operator: d.Operator}
+	if err := d.Hooks.Run(ctx, hooks.BeforeRollback, facts); err != nil {
+		return ledger.Entry{}, err
+	}
+	e, err := d.rollback(ctx, t)
+	if err != nil {
+		d.failed(ctx, facts, err)
+		return e, err
+	}
+	facts.Release, facts.Revision = e.Release, e.Revision
+	if err := d.Hooks.Run(ctx, hooks.AfterRollback, facts); err != nil {
+		return e, fmt.Errorf("deployer: %s/%s runs %s and it is recorded, but %w", t.App, t.Stack, e.Release, err)
+	}
+	return e, nil
+}
+
+// rollback runs the rollback on the host and records it.
+func (d *Deployer) rollback(ctx context.Context, t target.Target) (ledger.Entry, error) {
 	req := onhost.Request{Action: onhost.ActionRollback, Target: t, Operator: d.Operator, HealthTimeout: d.HealthTimeout, Keep: d.Keep}
 	res, err := d.run(ctx, t, req, "")
 	if err != nil {
@@ -266,6 +305,15 @@ func (d *Deployer) Rollback(ctx context.Context, app, stack string) (ledger.Entr
 		Revision: rev, Previous: res.Previous, Operator: d.Operator,
 	}
 	return e, d.record(e)
+}
+
+// failed runs the failed hook. The failure it follows is the one reported;
+// the hook's own failure is only logged.
+func (d *Deployer) failed(ctx context.Context, f hooks.Facts, cause error) {
+	f.Error = cause.Error()
+	if err := d.Hooks.Run(ctx, hooks.Failed, f); err != nil {
+		d.logf("warning: %v", err)
+	}
 }
 
 // Unlock removes a stack's stale deploy lock, left by a deploy that was cut

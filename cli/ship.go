@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/plexusone/deployforge/deploy/deployer"
+	"github.com/plexusone/deployforge/deploy/hooks"
 	"github.com/plexusone/deployforge/deploy/readiness"
 	"github.com/plexusone/deployforge/deploy/secrets"
 	"github.com/plexusone/deployforge/deploy/ship"
@@ -88,12 +89,24 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer f
 			if err := say("packaging %s in a temporary worktree", app); err != nil {
 				return err
 			}
+			d, err := newDeployer(c)
+			if err != nil {
+				return err
+			}
+			facts := hooks.Facts{App: app, Stack: stack, Host: s.Host, Operator: d.Operator, Tag: tag}
+			if err := d.Hooks.Run(c.Context(), hooks.BeforePackage, facts); err != nil {
+				return err
+			}
 			p, err := ship.Build(c.Context(), ship.Options{
 				App: app, Repo: repo, Tag: tag, Deployforge: self, Fleet: fleetAbs, Script: script,
 				Fetch: !noFetch, Local: local, Ref: ref, Upstreams: ups,
 				RequirePushed: local, AllowUnpushed: allow, Log: c.ErrOrStderr(),
 			})
 			if err != nil {
+				facts.Error = err.Error()
+				if herr := d.Hooks.Run(c.Context(), hooks.Failed, facts); herr != nil {
+					err = errors.Join(err, herr)
+				}
 				return err
 			}
 			defer func() {
@@ -102,8 +115,8 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer f
 					err = errors.Join(err, fmt.Errorf("ship: cleaning up the temporary worktree: %w", cerr))
 				}
 			}()
-			d, err := newDeployer(c)
-			if err != nil {
+			facts.Revision = p.Commit
+			if err := d.Hooks.Run(c.Context(), hooks.AfterPackage, facts); err != nil {
 				return err
 			}
 			if d.Store, err = openStore(c); err != nil {

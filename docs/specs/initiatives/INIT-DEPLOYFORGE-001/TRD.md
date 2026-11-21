@@ -141,11 +141,20 @@ per-zone overrides.
 
 ## Hooks
 
-Before and after each phase (`package`, `migrate`, `switch`, `health`,
-`rollback`), a hook runs an executable from the operator's repository
-with the app, stack, release and revision in its environment and no
-secret values. A failing before-hook stops the deploy; an after-hook's
-failure is reported.
+Hooks run on the operator's machine, around what the operator starts:
+`before-package` and `after-package` around packaging, `before-deploy`
+and `after-deploy` around a release, `before-rollback` and
+`after-rollback` around a rollback, and `failed` after any of them fails.
+The steps on the host (migrate, switch, health) run inside one request,
+so they have no hooks of their own.
+
+A hook is an executable named for it in `.deployforge/hooks/` (or
+`--hooks`), run with `DEPLOYFORGE_HOOK`, `_APP`, `_STACK`, `_HOST`,
+`_OPERATOR`, `_RELEASE`, `_REVISION`, `_TAG` and, for `failed`, `_ERROR`
+in its environment, and never a secret value. A missing hook is skipped.
+A failing before-hook stops what it precedes; an after-hook runs once the
+change is done and recorded, so its failure is reported without undoing
+it; the `failed` hook's own failure is only logged.
 
 ## Security
 

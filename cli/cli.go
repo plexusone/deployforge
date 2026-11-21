@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/plexusone/deployforge/deploy/deployer"
+	"github.com/plexusone/deployforge/deploy/hooks"
 	"github.com/plexusone/deployforge/deploy/onhost"
 	"github.com/plexusone/deployforge/deploy/secrets"
 	"github.com/plexusone/deployforge/deploy/secrets/awsssm"
@@ -200,7 +201,7 @@ func releaseCmd(load func() (*fleet.Fleet, error)) *cobra.Command {
 }
 
 func deployCmd(load func() (*fleet.Fleet, error), fleetPath *string, o Options) *cobra.Command {
-	var ledgerDir, hostBinary, sshKey, operator string
+	var ledgerDir, hostBinary, sshKey, operator, hooksDir string
 	var healthTimeout, keep int
 	root := &cobra.Command{
 		Use:   "deploy",
@@ -230,6 +231,7 @@ Environment:
 	pf.StringVar(&operator, "operator", cmp.Or(os.Getenv(EnvOperator), os.Getenv("USER")), "who is deploying, for the lock, the audit log and the ledger")
 	pf.IntVar(&healthTimeout, "health-timeout", 60, "seconds to wait for every host name to answer /readyz after a restart")
 	pf.IntVar(&keep, "keep", 5, "releases kept on the host, at least 2")
+	pf.StringVar(&hooksDir, "hooks", hooks.DefaultDir, "directory of hook scripts run around a deploy: "+strings.Join(hooks.Names(), ", "))
 
 	newDeployer := func(c *cobra.Command) (*deployer.Deployer, error) {
 		f, err := load()
@@ -239,6 +241,7 @@ Environment:
 		return &deployer.Deployer{
 			Fleet: f, LedgerDir: ledgerDir, Dial: deployer.SSHDialer(sshKey), HostBinary: hostBinary,
 			Operator: operator, HealthTimeout: healthTimeout, Keep: keep, Log: c.ErrOrStderr(),
+			Hooks: &hooks.Runner{Dir: hooksDir, Out: c.ErrOrStderr()},
 		}, nil
 	}
 	openStore := o.Store

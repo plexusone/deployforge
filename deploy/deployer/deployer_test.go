@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/plexusone/deployforge/deploy/archive"
+	"github.com/plexusone/deployforge/deploy/hooks"
 	"github.com/plexusone/deployforge/deploy/onhost"
 	"github.com/plexusone/deployforge/deploy/secrets"
 	"github.com/plexusone/deployforge/fleet"
@@ -484,5 +485,74 @@ func TestUnlockClearsAStaleLock(t *testing.T) {
 	}
 	if got := r.ledger(); len(got) != 1 {
 		t.Errorf("an unlock reached the ledger: %+v", got)
+	}
+}
+
+func TestHooksRunAroundAReleaseAndARollback(t *testing.T) {
+	r := newRig(t)
+	dir := t.TempDir()
+	logFile := filepath.Join(dir, "hooks.log")
+	for _, h := range hooks.Names() {
+		body := "#!/bin/sh\necho \"$DEPLOYFORGE_HOOK $DEPLOYFORGE_RELEASE $DEPLOYFORGE_ERROR\" >> " + logFile + "\n"
+		if err := os.WriteFile(filepath.Join(dir, h), []byte(body), 0o755); err != nil { //nolint:gosec // G306: a hook must be executable
+			t.Fatal(err)
+		}
+	}
+	r.d.Hooks = &hooks.Runner{Dir: dir}
+	e, err := r.d.Release(context.Background(), r.opts())
+	if err != nil {
+		t.Fatalf("%v\n%s", err, r.log.String())
+	}
+	r.clock = r.clock.Add(time.Hour)
+	r.archive, r.sum = r.build("one-cloud 0123456789ab\n", true)
+	if _, err := r.d.Release(context.Background(), r.opts()); err != nil {
+		t.Fatal(err)
+	}
+	r.clock = r.clock.Add(time.Hour)
+	if _, err := r.d.Rollback(context.Background(), "one-cloud", "prod"); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(logFile) //nolint:gosec // G304: the test's own file
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	for i := range lines {
+		lines[i] = strings.TrimSpace(lines[i])
+	}
+	if len(lines) != 6 || lines[0] != "before-deploy "+e.Release || lines[1] != "after-deploy "+e.Release ||
+		lines[4] != "before-rollback" || lines[5] != "after-rollback "+e.Release {
+		t.Errorf("hooks ran:\n%s", data)
+	}
+}
+
+func TestAFailingBeforeHookStopsTheDeployAndAFailureRunsTheFailedHook(t *testing.T) {
+	r := newRig(t)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, hooks.BeforeDeploy), []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil { //nolint:gosec // G306: a hook must be executable
+		t.Fatal(err)
+	}
+	r.d.Hooks = &hooks.Runner{Dir: dir}
+	if _, err := r.d.Release(context.Background(), r.opts()); err == nil || !strings.Contains(err.Error(), "before-deploy failed") {
+		t.Fatalf("err = %v", err)
+	}
+	if len(r.tr.calls) != 0 {
+		t.Errorf("the host was reached: %q", r.tr.calls)
+	}
+
+	marker := filepath.Join(dir, "failed.txt")
+	if err := os.Remove(filepath.Join(dir, hooks.BeforeDeploy)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, hooks.Failed), []byte("#!/bin/sh\necho \"$DEPLOYFORGE_ERROR\" > "+marker+"\n"), 0o755); err != nil { //nolint:gosec // G306: a hook must be executable
+		t.Fatal(err)
+	}
+	// The release this deploy makes never becomes ready.
+	r.tr.sys.unhealthy[r.clock.Format("20060102T150405Z")+"-abc1234def56"] = true
+	if _, err := r.d.Release(context.Background(), r.opts()); err == nil {
+		t.Fatal("an unhealthy release succeeded")
+	}
+	if data, err := os.ReadFile(marker); err != nil || !strings.Contains(string(data), "failed") { //nolint:gosec // G304: the test's own file
+		t.Errorf("the failed hook: %q, %v", data, err)
 	}
 }
