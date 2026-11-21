@@ -36,6 +36,8 @@ type Options struct {
 	// Store opens the secret store a release reads; AWS SSM Parameter
 	// Store with the default AWS configuration when nil.
 	Store func(c *cobra.Command) (secrets.Store, error)
+	// Dial reaches hosts with an SSH key; the system's ssh and scp when nil.
+	Dial func(key string) deployer.Dialer
 }
 
 // Environment variables the commands read.
@@ -61,12 +63,21 @@ func New(o Options) *cobra.Command {
 		schemaCmd(),
 		nextPortCmd(load),
 		unitCmd(load),
+		hostCmd(load, dialer(o)),
 		releaseCmd(load),
 		deployCmd(load, &fleetPath, o),
 		ledgerCmd(load),
 		onHostCmd(),
 	)
 	return root
+}
+
+// dialer is the option's dialer, or the system's ssh and scp.
+func dialer(o Options) func(key string) deployer.Dialer {
+	if o.Dial != nil {
+		return o.Dial
+	}
+	return deployer.SSHDialer
 }
 
 func validateCmd(load func() (*fleet.Fleet, error)) *cobra.Command {
