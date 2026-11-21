@@ -69,8 +69,10 @@ type Block struct {
 
 type data struct {
 	Host, Email, CertDir string
-	Ranges               []netip.Prefix
-	Blocks               []Block
+	// DisableCerts is true when every block serves an origin certificate.
+	DisableCerts bool
+	Ranges       []netip.Prefix
+	Blocks       []Block
 }
 
 var certDirPattern = regexp.MustCompile(`^(/[A-Za-z0-9._-]+)+$`)
@@ -127,6 +129,7 @@ func Render(f *fleet.Fleet, o Options) ([]byte, error) {
 		return nil, err
 	}
 	d := data{Host: o.Host, Email: f.ACMEEmail, CertDir: certDir, Blocks: blocks}
+	d.DisableCerts = len(blocks) > 0 && !slices.ContainsFunc(blocks, func(b Block) bool { return !b.Cert })
 	if slices.ContainsFunc(blocks, func(b Block) bool { return b.Cert }) {
 		if len(o.Ranges) == 0 {
 			return nil, fmt.Errorf("caddy: an app on %s is behind cloudflare, so Cloudflare's ranges are required", o.Host)

@@ -32,6 +32,7 @@ func TestAnAppBehindCloudflareGetsItsOriginCertificateAndTheTrustedRanges(t *tes
 	}
 	got := string(out)
 	for _, want := range []string{
+		"auto_https disable_certs",
 		"trusted_proxies static 173.245.48.0/20 ",
 		"client_ip_headers CF-Connecting-IP X-Forwarded-For",
 		"# one-cloud prod\none.example.com, auth.one.example.com {",
@@ -60,7 +61,7 @@ func TestAnAppWithNoEdgeGetsCertificatesFromCaddy(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := string(out)
-	if strings.Contains(got, "tls ") || strings.Contains(got, "trusted_proxies") {
+	if strings.Contains(got, "tls ") || strings.Contains(got, "trusted_proxies") || strings.Contains(got, "disable_certs") {
 		t.Errorf("an app with no edge has origin certificates or trusted proxies:\n%s", got)
 	}
 	if !strings.Contains(got, "email ops@example.com") || !strings.Contains(got, "stage-app.one.example.com {") {

@@ -2,6 +2,12 @@
 # Host {{.Host}}: one block per stack on it, each forwarding its host names to
 # its app's loopback port.
 {
+{{- if .DisableCerts}}
+	# Every app on this host is behind Cloudflare, whose firewall rules
+	# leave ACME no way in: each block serves its zone's origin
+	# certificate, and Caddy gets none itself.
+	auto_https disable_certs
+{{- end}}
 {{- if .Email}}
 	email {{.Email}}
 {{- end}}
