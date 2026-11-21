@@ -2,7 +2,10 @@ module github.com/plexusone/deployforge
 
 go 1.26.0
 
-require github.com/invopop/jsonschema v0.14.0
+require (
+	github.com/invopop/jsonschema v0.14.0
+	golang.org/x/mod v0.43.0
+)
 
 require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
