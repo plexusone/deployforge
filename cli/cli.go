@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/plexusone/deployforge/dbroles"
+	"github.com/plexusone/deployforge/dbsnapshot"
 	"github.com/plexusone/deployforge/deploy/deployer"
 	"github.com/plexusone/deployforge/deploy/hooks"
 	"github.com/plexusone/deployforge/deploy/hostaddr"
@@ -44,6 +45,18 @@ type Options struct {
 	// Params opens the parameter store database provisioning reads and
 	// writes; AWS SSM Parameter Store when nil.
 	Params func(c *cobra.Command) (dbroles.Store, error)
+	// Lightsail opens the client database snapshots use; Lightsail with the
+	// default AWS configuration when nil.
+	Lightsail func(c *cobra.Command) (dbsnapshot.API, error)
+}
+
+// lightsailOpener is the option's opener, or Lightsail with the default
+// AWS configuration.
+func lightsailOpener(o Options) func(c *cobra.Command) (dbsnapshot.API, error) {
+	if o.Lightsail != nil {
+		return o.Lightsail
+	}
+	return func(c *cobra.Command) (dbsnapshot.API, error) { return lightsailAPI(c.Context()) }
 }
 
 // Environment variables the commands read.
@@ -329,7 +342,7 @@ Environment:
 			return err
 		},
 	})
-	root.AddCommand(shipCmd(load, fleetPath, newDeployer, openStore))
+	root.AddCommand(shipCmd(load, fleetPath, newDeployer, openStore, lightsailOpener(o)))
 	root.AddCommand(&cobra.Command{
 		Use:   "unlock <app> <stack>",
 		Short: "Remove the stack's deploy lock, left by a deploy that was cut off",

@@ -200,6 +200,9 @@ type DatabaseServer struct {
 	// Reachable are databases the provider owns, such as template1, whose
 	// CONNECT cannot be revoked; they hold no app's data.
 	Reachable []string `json:"reachable,omitempty" jsonschema:"description=Databases the provider owns whose CONNECT cannot be revoked\\, such as template1"`
+	// LightsailName is the server's name as a Lightsail relational
+	// database, for snapshots before a deploy; none are taken without it.
+	LightsailName string `json:"lightsailName,omitempty" jsonschema:"description=The server's name as a Lightsail relational database\\, for snapshots before a deploy"`
 }
 
 // SecretSource names where a secret is kept; give exactly one.
@@ -566,6 +569,9 @@ func validateServer(srv *DatabaseServer, hosts map[string]bool, bad func(at, for
 	case pw.PulumiConfig != nil && (!pulumiName.MatchString(pw.PulumiConfig.Stack) || !pulumiKey.MatchString(pw.PulumiConfig.Key) ||
 		strings.TrimSpace(pw.PulumiConfig.Dir) == "" || strings.HasPrefix(pw.PulumiConfig.Dir, "-")):
 		bad(at, "adminPassword.pulumiConfig needs a dir, a stack and a key")
+	}
+	if srv.LightsailName != "" && !namePattern.MatchString(strings.ToLower(srv.LightsailName)) {
+		bad(at, "lightsailName %q must be letters, digits and hyphens", srv.LightsailName)
 	}
 	if !hosts[srv.Via] {
 		bad(at, "via %q is not in hosts", srv.Via)

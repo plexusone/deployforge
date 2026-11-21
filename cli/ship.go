@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/plexusone/deployforge/dbsnapshot"
 	"github.com/plexusone/deployforge/deploy/deployer"
 	"github.com/plexusone/deployforge/deploy/hooks"
 	"github.com/plexusone/deployforge/deploy/readiness"
@@ -21,10 +22,10 @@ import (
 // shipCmd is a whole routine deploy in one command: package the tag in a
 // temporary worktree, deploy it, and check every host name from outside.
 func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer func(*cobra.Command) (*deployer.Deployer, error),
-	openStore func(*cobra.Command) (secrets.Store, error)) *cobra.Command {
+	openStore func(*cobra.Command) (secrets.Store, error), openLightsail func(*cobra.Command) (dbsnapshot.API, error)) *cobra.Command {
 	var tag, repo, config, ref, script, selfcheck string
 	var with, allowUnpushed []string
-	var noFetch, local, skipPublic bool
+	var noFetch, local, skipPublic, noSnapshot bool
 	cmd := &cobra.Command{
 		Use:   "ship <app> <stack> (--tag vX.Y.Z | --local [--with <repo>[@ref]]...)",
 		Short: "Package the app in a temporary worktree, deploy it, and check each host name",
@@ -32,6 +33,9 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer f
 			"temporary git worktree, so the checkout is left as it is, deploys it as deploy release does with\n" +
 			"the stack's config (default stacks/<app>/<stack>/config.yaml), and checks https://<host>/readyz for\n" +
 			"each of the stack's host names from outside. Commit the ledger entry afterwards.\n\n" +
+			"Before deploying an app's primary stack that has databases, it takes a snapshot of the fleet's database\n" +
+			"server when the server is a Lightsail database, and waits until it is available, so a migrate that goes\n" +
+			"wrong can be undone by restoring it; a snapshot that fails stops the deploy. --no-db-snapshot skips it.\n\n" +
 			"With --tag it fetches and packages the app's release tag, with GOWORK off. With --local it packages\n" +
 			"the app's local --ref (default main) instead, untagged, and each --with repository from its own\n" +
 			"checkout's local commit ($GOPATH/src/<repo>; main unless @ref is given) through a generated\n" +
@@ -122,6 +126,26 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer f
 			if d.Store, err = openStore(c); err != nil {
 				return err
 			}
+			if takesSnapshot(f, a, stack) && !noSnapshot {
+				api, err := openLightsail(c)
+				if err != nil {
+					return err
+				}
+				label := tag
+				if local {
+					label = "local " + p.Commit[:12]
+				}
+				if err := say("snapshotting the database server before the deploy"); err != nil {
+					return err
+				}
+				snap, err := snapshotBeforeDeploy(c.Context(), api, f.DatabaseServer.LightsailName, app, stack, label, c.ErrOrStderr())
+				if err != nil {
+					return fmt.Errorf("ship: the snapshot before the deploy failed, so nothing was deployed: %w", err)
+				}
+				if err := say("snapshot %s is %s", snap.Name, snap.State); err != nil {
+					return err
+				}
+			}
 			e, err := d.Release(c.Context(), deployer.ReleaseOptions{
 				App: app, Stack: stack, Archive: p.Archive, Config: config, Tag: tag, Selfcheck: selfcheck,
 			})
@@ -155,6 +179,7 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer f
 	fl.StringVar(&selfcheck, "selfcheck", "report", "enforce, report or off: run the app's self-check, if the fleet document turns it on")
 	fl.BoolVar(&noFetch, "no-fetch", false, "do not fetch the tag from origin first")
 	fl.BoolVar(&skipPublic, "skip-public-check", false, "do not check the host names from outside afterwards")
+	fl.BoolVar(&noSnapshot, "no-db-snapshot", false, "do not snapshot the database server before deploying the primary stack")
 	return cmd
 }
 

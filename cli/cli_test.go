@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/plexusone/deployforge/fleet"
 )
 
 const testFleet = "../fleet/testdata/fleet.json"
@@ -108,5 +110,30 @@ func TestUpstreams(t *testing.T) {
 	}
 	if _, err := upstreams([]string{"lib"}); err == nil {
 		t.Error("a repository without host and org")
+	}
+}
+
+func TestTakesSnapshotOnlyForThePrimaryStackWithDatabasesOnLightsail(t *testing.T) {
+	f, err := fleet.Load(testFleet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, _ := f.App("example-app") // the sample has it
+	if takesSnapshot(f, a, "prod") {
+		t.Error("a snapshot without a database server")
+	}
+	f.DatabaseServer = &fleet.DatabaseServer{LightsailName: "fleet-prod-pg"}
+	if !takesSnapshot(f, a, "prod") {
+		t.Error("no snapshot for prod, which has databases")
+	}
+	if takesSnapshot(f, a, "staging") {
+		t.Error("a snapshot for staging, which is not the primary stack")
+	}
+	f.DatabaseServer.LightsailName = ""
+	if takesSnapshot(f, a, "prod") {
+		t.Error("a snapshot of a server that is not on Lightsail")
+	}
+	if _, err := run(t, "db", "snapshot", "list"); err == nil || !strings.Contains(err.Error(), "no lightsailName") {
+		t.Errorf("list without a server: %v", err)
 	}
 }

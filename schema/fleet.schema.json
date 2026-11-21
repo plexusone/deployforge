@@ -151,6 +151,10 @@
           },
           "type": "array",
           "description": "Databases the provider owns whose CONNECT cannot be revoked, such as template1"
+        },
+        "lightsailName": {
+          "type": "string",
+          "description": "The server's name as a Lightsail relational database, for snapshots before a deploy"
         }
       },
       "additionalProperties": false,
