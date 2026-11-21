@@ -1,0 +1,29 @@
+{
+  "formatVersion": "1",
+  "portRange": { "min": 8101, "max": 8199 },
+  "hosts": [{ "name": "web-1", "address": "203.0.113.10" }],
+  "apps": [
+    {
+      "name": "example-app",
+      "repo": "github.com/example/example-app",
+      "domain": "example.com",
+      "secretPrefix": "/example/{stack}/example-app/",
+      "stacks": {
+        "prod": {
+          "host": "web-1",
+          "hosts": ["app.example.com", "auth.example.com"],
+          "port": 8101,
+          "databases": [{ "name": "example_auth" }, { "name": "example", "appRole": true }],
+          "status": "live",
+          "limits": { "memoryMax": "512M", "cpuQuota": "50%", "connectionLimit": 10 }
+        },
+        "staging": {
+          "host": "web-1",
+          "hosts": ["stage-app.example.com"],
+          "port": 8102,
+          "status": "planned"
+        }
+      }
+    }
+  ]
+}
