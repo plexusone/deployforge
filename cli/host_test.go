@@ -3,6 +3,11 @@ package cli
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/pem"
 	"io"
 	"os"
 	"strings"
@@ -13,12 +18,15 @@ import (
 	"github.com/plexusone/deployforge/dbroles"
 	"github.com/plexusone/deployforge/deploy/deployer"
 	"github.com/plexusone/deployforge/fleet"
+	"github.com/plexusone/deployforge/origincert"
 )
 
 // fakeTransport records what a command does on a host.
 type fakeTransport struct {
 	calls  []string
 	script string
+	// csr is what openssl req prints on the host.
+	csr string
 }
 
 func (f *fakeTransport) TempDir(context.Context) (string, error) { return "/tmp/tmp.abc", nil }
@@ -33,8 +41,12 @@ func (f *fakeTransport) Upload(_ context.Context, local, remote string) error {
 }
 func (f *fakeTransport) Sudo(_ context.Context, argv []string, _ io.Reader, stdout, _ io.Writer) error {
 	f.calls = append(f.calls, "sudo "+strings.Join(argv, " "))
-	if argv[0] == "bash" {
+	switch argv[0] {
+	case "bash":
 		_, err := io.WriteString(stdout, "example-app is ready for its first deploy\n")
+		return err
+	case "openssl":
+		_, err := io.WriteString(stdout, f.csr)
 		return err
 	}
 	return nil
@@ -169,5 +181,60 @@ func TestDBRolesPlanShowsNoPasswordAndApplyNeedsConfirm(t *testing.T) {
 	}
 	if len(params) != 1 {
 		t.Errorf("apply without --confirm wrote parameters: %v", params)
+	}
+}
+
+// fakeOrigin signs nothing; it returns a certificate for the request.
+type fakeOrigin struct{ got origincert.Request }
+
+func (f *fakeOrigin) Create(_ context.Context, r origincert.Request) (*origincert.Certificate, error) {
+	f.got = r
+	return &origincert.Certificate{ID: "42", Certificate: "-----BEGIN CERTIFICATE-----\nAA==\n-----END CERTIFICATE-----\n", Hostnames: r.Hostnames}, nil
+}
+func (f *fakeOrigin) List(context.Context, string) ([]origincert.Certificate, error) { return nil, nil }
+func (f *fakeOrigin) Revoke(context.Context, string) error                           { return nil }
+
+func TestOriginCertInstallMakesTheKeyOnTheHost(t *testing.T) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	der, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{}, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr := &fakeTransport{csr: string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: der}))}
+	origin := &fakeOrigin{}
+	cmd := New(Options{Fleet: testFleet,
+		Dial:     func(string) deployer.Dialer { return func(fleet.Host) (deployer.Transport, error) { return tr, nil } },
+		OriginCA: func() (origincert.API, error) { return origin, nil },
+	})
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetErr(&buf)
+	cmd.SetArgs([]string{"origin-cert", "install", "example.com", "web-1"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("%v\n%s", err, buf.String())
+	}
+	want := []string{
+		"sudo install -d -o root -g caddy -m 0750 /etc/caddy/certs",
+		"sudo openssl req -new -newkey rsa:2048 -noenc -batch -keyout /etc/caddy/certs/example.com.key.new",
+		"upload /tmp/tmp.abc/example.com.pem",
+		"sudo install -o root -g caddy -m 0640 /tmp/tmp.abc/example.com.pem /etc/caddy/certs/example.com.pem",
+		"sudo install -o root -g caddy -m 0640 /etc/caddy/certs/example.com.key.new /etc/caddy/certs/example.com.key",
+		"sudo rm -f /etc/caddy/certs/example.com.key.new",
+		"sudo rm -rf /tmp/tmp.abc",
+	}
+	if got := strings.Join(tr.calls, "\n"); got != strings.Join(want, "\n") {
+		t.Errorf("calls:\n%s", got)
+	}
+	if origin.got.KeyType != "ecc" || origin.got.Hostnames[1] != "*.example.com" {
+		t.Errorf("request %+v", origin.got)
+	}
+	if !strings.Contains(tr.script, "BEGIN CERTIFICATE") {
+		t.Errorf("uploaded %q", tr.script)
+	}
+	if _, err := run(t, "origin-cert", "install", "Example.com;", "web-1"); err == nil {
+		t.Error("a zone that is not a zone name")
 	}
 }

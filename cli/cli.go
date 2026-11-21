@@ -26,6 +26,7 @@ import (
 	"github.com/plexusone/deployforge/deploy/systemd"
 	"github.com/plexusone/deployforge/fleet"
 	"github.com/plexusone/deployforge/ledger"
+	"github.com/plexusone/deployforge/origincert"
 	"github.com/plexusone/deployforge/provenance"
 	"github.com/plexusone/deployforge/release"
 	"github.com/plexusone/deployforge/schema"
@@ -48,6 +49,17 @@ type Options struct {
 	// Lightsail opens the client database snapshots use; Lightsail with the
 	// default AWS configuration when nil.
 	Lightsail func(c *cobra.Command) (dbsnapshot.API, error)
+	// OriginCA opens Cloudflare's Origin CA; the official client with the
+	// token in CLOUDFLARE_API_TOKEN when nil.
+	OriginCA func() (origincert.API, error)
+}
+
+// originOpener is the option's Origin CA, or Cloudflare's.
+func originOpener(o Options) func() (origincert.API, error) {
+	if o.OriginCA != nil {
+		return o.OriginCA
+	}
+	return originAPI
 }
 
 // lightsailOpener is the option's opener, or Lightsail with the default
@@ -87,6 +99,7 @@ func New(o Options) *cobra.Command {
 		caddyCmd(load, dialer(o)),
 		dbCmd(load, o),
 		zonesCmd(load),
+		originCertCmd(load, dialer(o), originOpener(o)),
 		releaseCmd(load),
 		deployCmd(load, &fleetPath, o),
 		ledgerCmd(load),
