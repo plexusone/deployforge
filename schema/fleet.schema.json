@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/plexusone/deployforge/schema/fleet.schema.json",
+  "$ref": "#/$defs/Fleet",
+  "$defs": {
+    "App": {
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*[a-z0-9]$",
+          "description": "The app's name: its binary, and with the stack, its unit, user and paths"
+        },
+        "repo": {
+          "type": "string",
+          "description": "The repository that builds the binary, such as github.com/org/repo"
+        },
+        "domain": {
+          "type": "string",
+          "description": "The DNS zone every host name of the app is in"
+        },
+        "secretPrefix": {
+          "type": "string",
+          "description": "The app's secrets in the parameter store, with {stack} for the stack, such as /example/{stack}/app/"
+        },
+        "stateDirectory": {
+          "type": "boolean",
+          "description": "Whether the app keeps state on local disk and gets a private state directory"
+        },
+        "selfcheck": {
+          "type": "boolean",
+          "description": "Whether a deploy runs the app's selfcheck subcommand before and after the switch"
+        },
+        "stacks": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Stack"
+          },
+          "type": "object",
+          "description": "The app's deployments by stack name, such as prod and staging"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Why the app is set up this way; JSON has no comments"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "repo",
+        "secretPrefix",
+        "stacks"
+      ]
+    },
+    "Database": {
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "The database's name"
+        },
+        "appRole": {
+          "type": "boolean",
+          "description": "Whether the app runs as a separate role with rows only, rather than as the owner"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
+    "Fleet": {
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "description": "The JSON Schema this file follows, for editors"
+        },
+        "formatVersion": {
+          "type": "string",
+          "enum": [
+            "1"
+          ],
+          "description": "Version of the fleet document format the file follows"
+        },
+        "primaryStack": {
+          "type": "string",
+          "description": "The stack whose unit, user and paths are named for the app alone; prod when empty"
+        },
+        "portRange": {
+          "$ref": "#/$defs/PortRange",
+          "description": "The range apps' loopback ports come from"
+        },
+        "hosts": {
+          "items": {
+            "$ref": "#/$defs/Host"
+          },
+          "type": "array",
+          "minItems": 1,
+          "description": "The machines apps run on"
+        },
+        "apps": {
+          "items": {
+            "$ref": "#/$defs/App"
+          },
+          "type": "array",
+          "description": "The deployed apps"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "formatVersion",
+        "portRange",
+        "hosts",
+        "apps"
+      ]
+    },
+    "Host": {
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*[a-z0-9]$",
+          "description": "How stacks refer to the host"
+        },
+        "address": {
+          "type": "string",
+          "description": "The host's address for SSH, or a reference resolved at deploy time"
+        },
+        "sshUser": {
+          "type": "string",
+          "description": "The user to connect as over SSH, with sudo; ubuntu when empty"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "address"
+      ]
+    },
+    "Limits": {
+      "properties": {
+        "memoryMax": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*[KMG]$",
+          "description": "systemd MemoryMax, such as 512M or 1G"
+        },
+        "cpuQuota": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*%$",
+          "description": "systemd CPUQuota, such as 50%"
+        },
+        "connectionLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Each database role's CONNECTION LIMIT, which the app's pools should match"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "memoryMax",
+        "cpuQuota",
+        "connectionLimit"
+      ]
+    },
+    "PortRange": {
+      "properties": {
+        "min": {
+          "type": "integer",
+          "maximum": 65535,
+          "minimum": 1024,
+          "description": "The lowest port"
+        },
+        "max": {
+          "type": "integer",
+          "maximum": 65535,
+          "minimum": 1024,
+          "description": "The highest port"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "min",
+        "max"
+      ]
+    },
+    "Stack": {
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "The host the stack runs on, by name"
+        },
+        "hosts": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "minItems": 1,
+          "description": "Host names the reverse proxy forwards to the stack"
+        },
+        "port": {
+          "type": "integer",
+          "description": "The loopback port the binary listens on"
+        },
+        "databases": {
+          "items": {
+            "$ref": "#/$defs/Database"
+          },
+          "type": "array",
+          "description": "The stack's databases on the database server; each name unique across the fleet"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "planned",
+            "live",
+            "elsewhere"
+          ],
+          "description": "Where the stack runs"
+        },
+        "limits": {
+          "$ref": "#/$defs/Limits",
+          "description": "Resource limits; required once the stack is live"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "host",
+        "hosts",
+        "port",
+        "status"
+      ]
+    }
+  },
+  "title": "Fleet",
+  "description": "The hosts, the apps deployforge deploys to them, and each app's stacks."
+}
