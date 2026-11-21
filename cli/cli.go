@@ -61,7 +61,7 @@ func New(o Options) *cobra.Command {
 		nextPortCmd(load),
 		unitCmd(load),
 		releaseCmd(load),
-		deployCmd(load, o),
+		deployCmd(load, &fleetPath, o),
 		ledgerCmd(load),
 		onHostCmd(),
 	)
@@ -199,7 +199,7 @@ func releaseCmd(load func() (*fleet.Fleet, error)) *cobra.Command {
 	return root
 }
 
-func deployCmd(load func() (*fleet.Fleet, error), o Options) *cobra.Command {
+func deployCmd(load func() (*fleet.Fleet, error), fleetPath *string, o Options) *cobra.Command {
 	var ledgerDir, hostBinary, sshKey, operator string
 	var healthTimeout, keep int
 	root := &cobra.Command{
@@ -294,6 +294,7 @@ Environment:
 			return err
 		},
 	})
+	root.AddCommand(shipCmd(load, fleetPath, newDeployer, openStore))
 	root.AddCommand(&cobra.Command{
 		Use:   "unlock <app> <stack>",
 		Short: "Remove the stack's deploy lock, left by a deploy that was cut off",
