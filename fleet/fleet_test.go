@@ -145,3 +145,20 @@ func TestStack(t *testing.T) {
 		}
 	}
 }
+
+func TestLoopbackHostsAndLogFiles(t *testing.T) {
+	f := load(t)
+	a := f.Apps[0]
+	a.LogFiles = []string{"security.jsonl", "../escape"}
+	prod := a.Stacks["prod"]
+	prod.LoopbackHosts = []string{"auth.example.com", "elsewhere.example.com"}
+	a.Stacks["prod"] = prod
+	f.Apps[0] = a
+	err := f.Validate()
+	if err == nil || !strings.Contains(err.Error(), `log file "../escape"`) || !strings.Contains(err.Error(), "loopback host elsewhere.example.com") {
+		t.Errorf("err = %v", err)
+	}
+	if strings.Contains(err.Error(), "security.jsonl") || strings.Contains(err.Error(), "loopback host auth.example.com") {
+		t.Errorf("a good value was refused: %v", err)
+	}
+}

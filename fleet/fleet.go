@@ -88,6 +88,9 @@ type App struct {
 	// Selfcheck is whether a deploy runs the app's selfcheck subcommand
 	// before and after the switch.
 	Selfcheck bool `json:"selfcheck,omitempty" jsonschema:"description=Whether a deploy runs the app's selfcheck subcommand before and after the switch"`
+	// LogFiles are the files the app writes under /var/log/<unit>/, which
+	// the host rotates daily by rename, keeping a week.
+	LogFiles []string `json:"logFiles,omitempty" jsonschema:"description=Files the app writes under /var/log/<unit>/\\, rotated daily by rename and kept a week"`
 	// Stacks are the app's deployments, by name.
 	Stacks map[string]Stack `json:"stacks" jsonschema:"description=The app's deployments by stack name\\, such as prod and staging,minProperties=1"`
 	// Notes explain choices about the app; JSON has no comments.
@@ -100,6 +103,10 @@ type Stack struct {
 	Host string `json:"host" jsonschema:"description=The host the stack runs on\\, by name"`
 	// Hosts are the host names the reverse proxy forwards to the stack.
 	Hosts []string `json:"hosts" jsonschema:"description=Host names the reverse proxy forwards to the stack,minItems=1"`
+	// LoopbackHosts are host names among Hosts that the host resolves to
+	// itself, so the app's calls to them, such as to its own auth server,
+	// stay on the host instead of going out through a CDN.
+	LoopbackHosts []string `json:"loopbackHosts,omitempty" jsonschema:"description=Host names among hosts that the host resolves to itself\\, so the app's calls to them stay on the host"`
 	// Port is the stack's loopback port.
 	Port int `json:"port" jsonschema:"description=The loopback port the binary listens on"`
 	// Databases are the stack's databases on the database server.
@@ -244,6 +251,7 @@ var (
 	repoPattern   = regexp.MustCompile(`^[a-z0-9.-]+\.[a-z]+/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$`)
 	hostPattern   = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z][a-z0-9-]*[a-z0-9]$`)
 	dbPattern     = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+	logPattern    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 	memoryPattern = regexp.MustCompile(`^[1-9][0-9]*[KMG]$`)
 	cpuPattern    = regexp.MustCompile(`^[1-9][0-9]*%$`)
 )
@@ -313,6 +321,11 @@ func (f *Fleet) Validate() error {
 		if len(a.Stacks) == 0 {
 			bad(at, "needs at least one stack")
 		}
+		for _, l := range a.LogFiles {
+			if !logPattern.MatchString(l) {
+				bad(at, "log file %q must be a plain file name", l)
+			}
+		}
 		for _, stack := range f.StackNames(a) {
 			s := a.Stacks[stack]
 			at := at + "/" + stack
@@ -351,6 +364,11 @@ func (f *Fleet) Validate() error {
 					bad(at, "host name %s is used by %s", h, names[h])
 				}
 				names[h] = at
+			}
+			for _, h := range s.LoopbackHosts {
+				if !slices.Contains(s.Hosts, h) {
+					bad(at, "loopback host %s is not one of the stack's host names", h)
+				}
 			}
 			for _, db := range s.Databases {
 				switch {
