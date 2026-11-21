@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 
 	"github.com/plexusone/deployforge/deploy/secrets"
 )
@@ -24,6 +25,8 @@ type SSM struct {
 // API is the part of the SSM client this store uses, so tests can fake it.
 type API interface {
 	GetParametersByPath(ctx context.Context, in *ssm.GetParametersByPathInput, opts ...func(*ssm.Options)) (*ssm.GetParametersByPathOutput, error)
+	GetParameter(ctx context.Context, in *ssm.GetParameterInput, opts ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
+	PutParameter(ctx context.Context, in *ssm.PutParameterInput, opts ...func(*ssm.Options)) (*ssm.PutParameterOutput, error)
 }
 
 // NewWithClient uses the given client, such as one with its own
@@ -67,3 +70,28 @@ func (s *SSM) ByPath(ctx context.Context, path string) ([]secrets.Param, error) 
 }
 
 var _ secrets.Store = (*SSM)(nil)
+
+// Get returns a parameter's decrypted value, and false when there is none.
+func (s *SSM) Get(ctx context.Context, name string) (string, bool, error) {
+	out, err := s.client.GetParameter(ctx, &ssm.GetParameterInput{Name: aws.String(name), WithDecryption: aws.Bool(true)})
+	var nf *types.ParameterNotFound
+	switch {
+	case errors.As(err, &nf):
+		return "", false, nil
+	case err != nil:
+		return "", false, err
+	}
+	return aws.ToString(out.Parameter.Value), true, nil
+}
+
+// Put creates a SecureString parameter with the account's default key; it
+// never overwrites one.
+func (s *SSM) Put(ctx context.Context, name, value string) error {
+	_, err := s.client.PutParameter(ctx, &ssm.PutParameterInput{
+		Name: aws.String(name), Value: aws.String(value), Type: types.ParameterTypeSecureString, Overwrite: aws.Bool(false),
+	})
+	if err != nil {
+		return fmt.Errorf("put %s: %w", name, err)
+	}
+	return nil
+}

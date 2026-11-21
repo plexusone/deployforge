@@ -86,12 +86,80 @@
         "appRole": {
           "type": "boolean",
           "description": "Whether the app runs as a separate role with rows only, rather than as the owner"
+        },
+        "ownerDsn": {
+          "type": "string",
+          "description": "Parameter under the secret prefix holding the owner role's connection string, such as migrate/APP_PG_ADMIN_DSN"
+        },
+        "appDsn": {
+          "type": "string",
+          "description": "Parameter under the secret prefix holding the app role's connection string; required with appRole"
+        },
+        "appPassword": {
+          "type": "string",
+          "description": "Parameter under the secret prefix holding the app role's password alone, for a migration that sets it"
         }
       },
       "additionalProperties": false,
       "type": "object",
       "required": [
         "name"
+      ]
+    },
+    "DatabaseServer": {
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "description": "The server's host name; give it or endpointFrom"
+        },
+        "endpointFrom": {
+          "$ref": "#/$defs/AddressSource",
+          "description": "Where to read the server's host name, such as a Pulumi stack output"
+        },
+        "port": {
+          "type": "integer",
+          "maximum": 65535,
+          "minimum": 1,
+          "description": "The server's port; 5432 when empty"
+        },
+        "adminUser": {
+          "type": "string",
+          "description": "The administrator provisioning connects as"
+        },
+        "adminDatabase": {
+          "type": "string",
+          "description": "The database the administrator connects to"
+        },
+        "adminPassword": {
+          "$ref": "#/$defs/SecretSource",
+          "description": "Where the administrator's password is kept"
+        },
+        "via": {
+          "type": "string",
+          "description": "The fleet host that runs psql against the server"
+        },
+        "lockdown": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "The server's other databases, which no app's role may reach"
+        },
+        "reachable": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "Databases the provider owns whose CONNECT cannot be revoked, such as template1"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "adminUser",
+        "adminDatabase",
+        "adminPassword",
+        "via"
       ]
     },
     "Fleet": {
@@ -133,6 +201,10 @@
           },
           "type": "array",
           "description": "The deployed apps"
+        },
+        "databaseServer": {
+          "$ref": "#/$defs/DatabaseServer",
+          "description": "The PostgreSQL server the apps' databases are on, when deployforge provisions their roles"
         }
       },
       "additionalProperties": false,
@@ -218,6 +290,29 @@
         "max"
       ]
     },
+    "PulumiConfig": {
+      "properties": {
+        "dir": {
+          "type": "string",
+          "description": "The Pulumi project's directory"
+        },
+        "stack": {
+          "type": "string",
+          "description": "The Pulumi stack"
+        },
+        "key": {
+          "type": "string",
+          "description": "The configuration key, such as fleet:dbMasterPassword"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "dir",
+        "stack",
+        "key"
+      ]
+    },
     "PulumiOutput": {
       "properties": {
         "dir": {
@@ -240,6 +335,20 @@
         "stack",
         "output"
       ]
+    },
+    "SecretSource": {
+      "properties": {
+        "parameter": {
+          "type": "string",
+          "description": "A parameter's full name in the parameter store"
+        },
+        "pulumiConfig": {
+          "$ref": "#/$defs/PulumiConfig",
+          "description": "A Pulumi stack's secret configuration value"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
     },
     "Stack": {
       "properties": {

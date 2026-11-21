@@ -47,6 +47,9 @@ type Fleet struct {
 	ACMEEmail string `json:"acmeEmail,omitempty" jsonschema:"description=The address Caddy registers with for certificates it gets itself\\, for apps with no edge"`
 	// Apps are the deployed apps.
 	Apps []App `json:"apps" jsonschema:"description=The deployed apps"`
+	// DatabaseServer is the PostgreSQL server the apps' databases are on,
+	// when deployforge provisions their roles.
+	DatabaseServer *DatabaseServer `json:"databaseServer,omitempty" jsonschema:"description=The PostgreSQL server the apps' databases are on\\, when deployforge provisions their roles"`
 }
 
 // PortRange is an inclusive range of loopback ports.
@@ -144,12 +147,74 @@ type Stack struct {
 	Limits *Limits `json:"limits,omitempty" jsonschema:"description=Resource limits; required once the stack is live"`
 }
 
-// Database is one of a stack's databases. Its owner role migrates it; when
-// AppRole is set, the app runs as a separate role with rows only, and
-// otherwise it runs as the owner.
+// Database is one of a stack's databases. Its owner role, <name>_owner,
+// migrates it; when AppRole is set, the app runs as a separate role,
+// <name>_app, with rows only, and otherwise it runs as the owner.
+//
+// The parameters name where the roles' connections are kept, relative to
+// the app's secret prefix: a parameter under migrate/ reaches only the
+// migrate step.
 type Database struct {
 	Name    string `json:"name" jsonschema:"description=The database's name,pattern=^[a-z][a-z0-9_]*$"`
 	AppRole bool   `json:"appRole,omitempty" jsonschema:"description=Whether the app runs as a separate role with rows only\\, rather than as the owner"`
+	// OwnerDSN is the parameter holding the owner's connection string.
+	OwnerDSN string `json:"ownerDsn,omitempty" jsonschema:"description=Parameter under the secret prefix holding the owner role's connection string\\, such as migrate/APP_PG_ADMIN_DSN"`
+	// AppDSN is the parameter holding the app role's connection string.
+	AppDSN string `json:"appDsn,omitempty" jsonschema:"description=Parameter under the secret prefix holding the app role's connection string; required with appRole"`
+	// AppPassword is a parameter holding the app role's password alone,
+	// for a migration that sets it.
+	AppPassword string `json:"appPassword,omitempty" jsonschema:"description=Parameter under the secret prefix holding the app role's password alone\\, for a migration that sets it"`
+}
+
+// Owner is the database's owner role.
+func (d Database) Owner() string { return d.Name + "_owner" }
+
+// App is the database's app role, or empty when the app runs as the owner.
+func (d Database) App() string {
+	if !d.AppRole {
+		return ""
+	}
+	return d.Name + "_app"
+}
+
+// DatabaseServer is the PostgreSQL server the stacks' databases are on.
+type DatabaseServer struct {
+	// Endpoint is the server's host name. Give it or EndpointFrom.
+	Endpoint string `json:"endpoint,omitempty" jsonschema:"description=The server's host name; give it or endpointFrom"`
+	// EndpointFrom reads the endpoint from the tool that made the server.
+	EndpointFrom *AddressSource `json:"endpointFrom,omitempty" jsonschema:"description=Where to read the server's host name\\, such as a Pulumi stack output"`
+	// Port is 5432 when zero.
+	Port int `json:"port,omitempty" jsonschema:"description=The server's port; 5432 when empty,minimum=1,maximum=65535"`
+	// AdminUser and AdminDatabase are the administrator provisioning
+	// connects as, and the database it connects to.
+	AdminUser     string `json:"adminUser" jsonschema:"description=The administrator provisioning connects as"`
+	AdminDatabase string `json:"adminDatabase" jsonschema:"description=The database the administrator connects to"`
+	// AdminPassword is where the administrator's password is kept.
+	AdminPassword SecretSource `json:"adminPassword" jsonschema:"description=Where the administrator's password is kept"`
+	// Via is the fleet host provisioning runs psql on, which reaches the
+	// server; the operator's machine need not.
+	Via string `json:"via" jsonschema:"description=The fleet host that runs psql against the server"`
+	// Lockdown are the server's other databases, which no app's role may
+	// reach, such as the administrator's own.
+	Lockdown []string `json:"lockdown,omitempty" jsonschema:"description=The server's other databases\\, which no app's role may reach"`
+	// Reachable are databases the provider owns, such as template1, whose
+	// CONNECT cannot be revoked; they hold no app's data.
+	Reachable []string `json:"reachable,omitempty" jsonschema:"description=Databases the provider owns whose CONNECT cannot be revoked\\, such as template1"`
+}
+
+// SecretSource names where a secret is kept; give exactly one.
+type SecretSource struct {
+	// Parameter is a parameter's full name in the parameter store.
+	Parameter string `json:"parameter,omitempty" jsonschema:"description=A parameter's full name in the parameter store"`
+	// PulumiConfig is a Pulumi stack's secret configuration value.
+	PulumiConfig *PulumiConfig `json:"pulumiConfig,omitempty" jsonschema:"description=A Pulumi stack's secret configuration value"`
+}
+
+// PulumiConfig is one configuration value of a Pulumi stack.
+type PulumiConfig struct {
+	Dir   string `json:"dir" jsonschema:"description=The Pulumi project's directory"`
+	Stack string `json:"stack" jsonschema:"description=The Pulumi stack"`
+	Key   string `json:"key" jsonschema:"description=The configuration key\\, such as fleet:dbMasterPassword"`
 }
 
 // Edge is what is in front of an app's host names.
@@ -293,6 +358,8 @@ var (
 	dbPattern     = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 	logPattern    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 	pulumiName    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]*$`)
+	pulumiKey     = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]*$`)
+	paramPattern  = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_./-]*$`)
 	memoryPattern = regexp.MustCompile(`^[1-9][0-9]*[KMG]$`)
 	cpuPattern    = regexp.MustCompile(`^[1-9][0-9]*%$`)
 )
@@ -340,7 +407,7 @@ func (f *Fleet) Validate() error {
 			p := h.AddressFrom.Pulumi
 			if p == nil {
 				bad(at, "addressFrom names no source")
-			} else if !pulumiName.MatchString(p.Stack) || !pulumiName.MatchString(p.Output) || strings.TrimSpace(p.Dir) == "" || strings.HasPrefix(p.Dir, "-") {
+			} else if !validPulumiOutput(*p) {
 				bad(at, "addressFrom.pulumi needs a dir, and a stack and an output of letters, digits and . _ / -")
 			}
 		}
@@ -438,6 +505,14 @@ func (f *Fleet) Validate() error {
 					bad(at, "database %s is used by %s", db.Name, dbs[db.Name])
 				}
 				dbs[db.Name] = at
+				for _, prm := range []struct{ field, name string }{{"ownerDsn", db.OwnerDSN}, {"appDsn", db.AppDSN}, {"appPassword", db.AppPassword}} {
+					if prm.name != "" && (!paramPattern.MatchString(prm.name) || strings.Contains(prm.name, "..")) {
+						bad(at, "database %s: %s %q must be a parameter name under the prefix, such as migrate/APP_PG_ADMIN_DSN", db.Name, prm.field, prm.name)
+					}
+				}
+				if !db.AppRole && (db.AppDSN != "" || db.AppPassword != "") {
+					bad(at, "database %s has no app role, so no appDsn or appPassword", db.Name)
+				}
 			}
 			if !slices.Contains([]Status{Planned, Live, Elsewhere}, s.Status) {
 				bad(at, "status %q must be planned, live or elsewhere", s.Status)
@@ -458,7 +533,52 @@ func (f *Fleet) Validate() error {
 			}
 		}
 	}
+	if srv := f.DatabaseServer; srv != nil {
+		validateServer(srv, hostNames, bad)
+	}
 	return errors.Join(errs...)
+}
+
+func validateServer(srv *DatabaseServer, hosts map[string]bool, bad func(at, format string, a ...any)) {
+	const at = "databaseServer"
+	switch {
+	case srv.Endpoint == "" && srv.EndpointFrom == nil:
+		bad(at, "needs an endpoint or endpointFrom")
+	case srv.Endpoint != "" && srv.EndpointFrom != nil:
+		bad(at, "give an endpoint or endpointFrom, not both")
+	case srv.Endpoint != "" && !hostPattern.MatchString(srv.Endpoint):
+		bad(at, "endpoint %q must be a lowercase host name", srv.Endpoint)
+	case srv.EndpointFrom != nil && (srv.EndpointFrom.Pulumi == nil || !validPulumiOutput(*srv.EndpointFrom.Pulumi)):
+		bad(at, "endpointFrom.pulumi needs a dir, and a stack and an output of letters, digits and . _ / -")
+	}
+	if srv.Port < 0 || srv.Port > 65535 {
+		bad(at, "port %d is out of range", srv.Port)
+	}
+	if !dbPattern.MatchString(srv.AdminUser) || !dbPattern.MatchString(srv.AdminDatabase) {
+		bad(at, "adminUser and adminDatabase must be lowercase letters, digits and underscores")
+	}
+	pw := srv.AdminPassword
+	switch {
+	case (pw.Parameter == "") == (pw.PulumiConfig == nil):
+		bad(at, "adminPassword needs exactly one of parameter and pulumiConfig")
+	case pw.Parameter != "" && !strings.HasPrefix(pw.Parameter, "/"):
+		bad(at, "adminPassword.parameter %q must be a full name starting with /", pw.Parameter)
+	case pw.PulumiConfig != nil && (!pulumiName.MatchString(pw.PulumiConfig.Stack) || !pulumiKey.MatchString(pw.PulumiConfig.Key) ||
+		strings.TrimSpace(pw.PulumiConfig.Dir) == "" || strings.HasPrefix(pw.PulumiConfig.Dir, "-")):
+		bad(at, "adminPassword.pulumiConfig needs a dir, a stack and a key")
+	}
+	if !hosts[srv.Via] {
+		bad(at, "via %q is not in hosts", srv.Via)
+	}
+	for _, d := range append(append([]string{}, srv.Lockdown...), srv.Reachable...) {
+		if !dbPattern.MatchString(d) {
+			bad(at, "database %q must be lowercase letters, digits and underscores", d)
+		}
+	}
+}
+
+func validPulumiOutput(p PulumiOutput) bool {
+	return pulumiName.MatchString(p.Stack) && pulumiName.MatchString(p.Output) && strings.TrimSpace(p.Dir) != "" && !strings.HasPrefix(p.Dir, "-")
 }
 
 // NextPort is the lowest port in the range that no stack on the host

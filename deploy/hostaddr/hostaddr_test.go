@@ -38,3 +38,19 @@ func TestResolve(t *testing.T) {
 		t.Errorf("a failing pulumi: %v", err)
 	}
 }
+
+func TestConfig(t *testing.T) {
+	var argv []string
+	run := func(_ context.Context, _ string, a ...string) ([]byte, error) {
+		argv = a
+		return []byte("s3cr3t\n"), nil
+	}
+	v, err := Config(context.Background(), fleet.PulumiConfig{Dir: "stack", Stack: "prod", Key: "fleet:dbMasterPassword"}, run)
+	if err != nil || v != "s3cr3t" || strings.Join(argv, " ") != "pulumi config get fleet:dbMasterPassword --stack prod --non-interactive" {
+		t.Errorf("Config = %q, %v, ran %v", v, err, argv)
+	}
+	empty := func(context.Context, string, ...string) ([]byte, error) { return []byte("\n"), nil }
+	if _, err := Config(context.Background(), fleet.PulumiConfig{Dir: "stack", Stack: "prod", Key: "k"}, empty); err == nil {
+		t.Error("an empty value")
+	}
+}

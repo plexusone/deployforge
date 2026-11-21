@@ -199,3 +199,61 @@ func TestAddressFrom(t *testing.T) {
 		t.Errorf("none: %v", err)
 	}
 }
+
+func goodServer() *DatabaseServer {
+	return &DatabaseServer{
+		Endpoint: "db.example.internal", AdminUser: "admin", AdminDatabase: "fleet",
+		AdminPassword: SecretSource{PulumiConfig: &PulumiConfig{Dir: "stack", Stack: "prod", Key: "fleet:dbMasterPassword"}},
+		Via:           "web-1", Lockdown: []string{"fleet"}, Reachable: []string{"template1"},
+	}
+}
+
+func TestDatabaseServer(t *testing.T) {
+	f := load(t)
+	f.DatabaseServer = goodServer()
+	if err := f.Validate(); err != nil {
+		t.Fatalf("good: %v", err)
+	}
+	for name, tc := range map[string]struct {
+		mutate func(*DatabaseServer)
+		want   string
+	}{
+		"no endpoint": {func(s *DatabaseServer) { s.Endpoint = "" }, "needs an endpoint"},
+		"two endpoints": {func(s *DatabaseServer) {
+			s.EndpointFrom = &AddressSource{Pulumi: &PulumiOutput{Dir: "stack", Stack: "prod", Output: "dbEndpoint"}}
+		}, "not both"},
+		"two passwords":     {func(s *DatabaseServer) { s.AdminPassword.Parameter = "/fleet/admin" }, "exactly one"},
+		"no password":       {func(s *DatabaseServer) { s.AdminPassword = SecretSource{} }, "exactly one"},
+		"relative param":    {func(s *DatabaseServer) { s.AdminPassword = SecretSource{Parameter: "fleet/admin"} }, "full name"},
+		"unknown via":       {func(s *DatabaseServer) { s.Via = "web-9" }, `via "web-9"`},
+		"bad admin":         {func(s *DatabaseServer) { s.AdminUser = "Admin; drop" }, "adminUser"},
+		"bad lockdown":      {func(s *DatabaseServer) { s.Lockdown = []string{"x y"} }, `database "x y"`},
+		"bad pulumi key":    {func(s *DatabaseServer) { s.AdminPassword.PulumiConfig.Key = "-x" }, "pulumiConfig"},
+		"port out of range": {func(s *DatabaseServer) { s.Port = 70000 }, "port 70000"},
+	} {
+		srv := goodServer()
+		tc.mutate(srv)
+		f.DatabaseServer = srv
+		if err := f.Validate(); err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%s: err = %v, want %q", name, err, tc.want)
+		}
+	}
+}
+
+func TestDatabaseParameters(t *testing.T) {
+	d := Database{Name: "one", AppRole: true}
+	if d.Owner() != "one_owner" || d.App() != "one_app" || (Database{Name: "auth"}).App() != "" {
+		t.Errorf("roles: %s %s", d.Owner(), d.App())
+	}
+	f := load(t)
+	prod := f.Apps[0].Stacks["prod"]
+	prod.Databases = []Database{
+		{Name: "example_auth", OwnerDSN: "AUTH_DSN", AppDSN: "NOPE"},
+		{Name: "example", AppRole: true, OwnerDSN: "../escape", AppDSN: "APP_DSN"},
+	}
+	f.Apps[0].Stacks["prod"] = prod
+	err := f.Validate()
+	if err == nil || !strings.Contains(err.Error(), "example_auth has no app role") || !strings.Contains(err.Error(), `ownerDsn "../escape"`) {
+		t.Errorf("err = %v", err)
+	}
+}

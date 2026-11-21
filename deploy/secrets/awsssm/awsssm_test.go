@@ -31,6 +31,35 @@ func (f *fake) GetParametersByPath(_ context.Context, in *ssm.GetParametersByPat
 	}, nil
 }
 
+func (f *fake) GetParameter(_ context.Context, in *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
+	if aws.ToString(in.Name) == "/missing" {
+		return nil, &types.ParameterNotFound{}
+	}
+	return &ssm.GetParameterOutput{Parameter: &types.Parameter{Name: in.Name, Value: aws.String("v")}}, nil
+}
+
+func (f *fake) PutParameter(_ context.Context, in *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
+	if aws.ToBool(in.Overwrite) || in.Type != types.ParameterTypeSecureString {
+		f.t.Errorf("put %+v", in)
+	}
+	f.calls++
+	return &ssm.PutParameterOutput{}, nil
+}
+
+func TestGetAndPut(t *testing.T) {
+	f := &fake{t: t}
+	s := NewWithClient(f)
+	if v, ok, err := s.Get(context.Background(), "/a"); err != nil || !ok || v != "v" {
+		t.Errorf("Get = %q, %v, %v", v, ok, err)
+	}
+	if _, ok, err := s.Get(context.Background(), "/missing"); err != nil || ok {
+		t.Errorf("a missing parameter: %v, %v", ok, err)
+	}
+	if err := s.Put(context.Background(), "/b", "x"); err != nil || f.calls != 1 {
+		t.Errorf("Put: %v", err)
+	}
+}
+
 func TestByPathReadsEveryPage(t *testing.T) {
 	f := &fake{t: t}
 	got, err := NewWithClient(f).ByPath(context.Background(), "/example/prod/app/")
