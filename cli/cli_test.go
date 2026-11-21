@@ -137,3 +137,20 @@ func TestTakesSnapshotOnlyForThePrimaryStackWithDatabasesOnLightsail(t *testing.
 		t.Errorf("list without a server: %v", err)
 	}
 }
+
+func TestZonesValidateSchemaPageAndHardenNeedsAToken(t *testing.T) {
+	const doc = "../zones/testdata/zones.json"
+	if out, err := run(t, "zones", "--zones", doc, "validate"); err != nil || !strings.Contains(out, "1 zones, 4 records OK") {
+		t.Errorf("validate: %q, %v", out, err)
+	}
+	if out, err := run(t, "zones", "schema"); err != nil || !strings.Contains(out, `"$id"`) {
+		t.Errorf("schema: %v", err)
+	}
+	if out, err := run(t, "zones", "--zones", doc, "page"); err != nil || !strings.Contains(out, "app.example.com") {
+		t.Errorf("page: %v\n%s", err, out)
+	}
+	t.Setenv(TokenEnv, "")
+	if _, err := run(t, "zones", "--zones", doc, "harden", "plan"); err == nil || !strings.Contains(err.Error(), TokenEnv) {
+		t.Errorf("harden without a token: %v", err)
+	}
+}
