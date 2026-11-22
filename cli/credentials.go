@@ -3,6 +3,8 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -14,6 +16,7 @@ import (
 	"github.com/plexusone/systemspec-credential/credspec"
 	"github.com/spf13/cobra"
 
+	"github.com/plexusone/deployforge/credpage"
 	"github.com/plexusone/deployforge/deploy/preflight"
 	"github.com/plexusone/deployforge/fleet"
 )
@@ -80,7 +83,7 @@ func TargetsFor(f *fleet.Fleet, file string) (*targets.File, error) {
 
 // credentialsCmd is systemspec-credential's commands over the fleet's
 // registry (validate, status, record, report and more), with credforge's
-// check, generate, install and review beside them. The fleet document
+// check, generate, install, review and setup beside them, and the page. The fleet document
 // names the files; a flag given on the command line wins.
 func credentialsCmd(load func() (*fleet.Fleet, error), fleetPath *string) *cobra.Command {
 	files := func() (*fleet.Fleet, credentialFiles, error) {
@@ -100,10 +103,18 @@ func credentialsCmd(load func() (*fleet.Fleet, error), fleetPath *string) *cobra
 	}
 	cmd := credcli.New(credcli.Options{
 		Use:      "credentials",
-		Short:    "Check, report on, generate, install and record the credentials the fleet's registry describes",
+		Short:    "Check, report on, generate, install, set up and record the credentials the fleet's registry describes",
 		Registry: registry,
 	})
+	// tool is how the setup runbook's commands run these commands: this
+	// program, the commands down to credentials, and the fleet document.
+	tool := func() []string {
+		out := []string{program()}
+		out = append(out, strings.Fields(cmd.CommandPath())[1:]...)
+		return append(out, "--fleet", *fleetPath)
+	}
 	forge := forgecli.Options{
+		Tool:     tool,
 		Registry: registry,
 		Targets: func() (*targets.File, error) {
 			f, cf, err := files()
@@ -113,7 +124,8 @@ func credentialsCmd(load func() (*fleet.Fleet, error), fleetPath *string) *cobra
 			return TargetsFor(f, cf.targets)
 		},
 	}
-	cmd.AddCommand(forgecli.Check(forge), forgecli.Generate(forge), forgecli.Install(forge), forgecli.Review(forge))
+	cmd.AddCommand(forgecli.Check(forge), forgecli.Generate(forge), forgecli.Install(forge), forgecli.Review(forge), forgecli.Setup(forge),
+		credentialsPageCmd(files, tool))
 	// The flags' defaults come from the fleet document, which is read once
 	// the command line, with --fleet, is parsed.
 	cmd.PersistentPreRunE = func(c *cobra.Command, _ []string) error {
@@ -176,4 +188,70 @@ func preflightFor(o Options, fleetPath *string) func(c *cobra.Command, f *fleet.
 		_, err = fmt.Fprintf(c.OutOrStdout(), "%d secret(s) in place\n", r.Checked)
 		return err
 	}
+}
+
+// credentialsPageCmd writes an app stack's credentials page.
+func credentialsPageCmd(files func() (*fleet.Fleet, credentialFiles, error), tool func() []string) *cobra.Command {
+	var out, needs string
+	cmd := &cobra.Command{
+		Use:   "page <app> <stack>",
+		Short: "Write an HTML page of what the app stack's credentials are, how each is made and how to set them up",
+		Long: "page lists every credential the stack needs, how each is made, where it is stored and whether the\n" +
+			"event log records it, then the runbook for setting them up, as setup builds it, so its step numbers\n" +
+			"are setup's. It holds no value.",
+		Args: cobra.ExactArgs(2),
+		RunE: func(c *cobra.Command, args []string) error {
+			f, cf, err := files()
+			if err != nil {
+				return err
+			}
+			reg, err := credspec.LoadRegistry(cf.registry)
+			if err != nil {
+				return err
+			}
+			log, err := credspec.LoadLog(cf.events, reg)
+			if err != nil {
+				return err
+			}
+			var ns []credspec.Need
+			for _, n := range strings.Split(needs, ",") {
+				if n = strings.TrimSpace(n); n != "" {
+					ns = append(ns, credspec.Need(n))
+				}
+			}
+			page, err := credpage.Render(f, args[0], args[1], reg, log, credpage.Options{Needs: ns, Tool: tool()})
+			if err != nil {
+				return err
+			}
+			if out == "" {
+				_, err = c.OutOrStdout().Write(page)
+				return err
+			}
+			if err := os.WriteFile(out, page, 0o644); err != nil { //nolint:gosec // G306: the page is meant to be read and published
+				return fmt.Errorf("credentials page: %w", err)
+			}
+			_, err = fmt.Fprintf(c.OutOrStdout(), "wrote %s\n", out)
+			return err
+		},
+	}
+	cmd.Flags().StringVarP(&out, "output", "o", "", "file to write; standard output when empty")
+	cmd.Flags().StringVar(&needs, "need", "launch,later,optional", "the needs to show, comma-separated")
+	return cmd
+}
+
+// program is how this program is run: its name when that name on PATH is
+// this program, and otherwise the path it was run as.
+func program() string {
+	self := os.Args[0]
+	base := filepath.Base(self)
+	found, err := exec.LookPath(base)
+	if err != nil {
+		return self
+	}
+	a, errA := filepath.EvalSymlinks(found)
+	b, errB := filepath.EvalSymlinks(self)
+	if errA == nil && errB == nil && a == b {
+		return base
+	}
+	return self
 }

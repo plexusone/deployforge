@@ -12,8 +12,9 @@ require (
 	github.com/cloudflare/cloudflare-go/v7 v7.15.0
 	github.com/grokify/pgutil v0.2.0
 	github.com/invopop/jsonschema v0.14.0
-	github.com/plexusone/credforge v0.8.0
+	github.com/plexusone/credforge v0.9.0
 	github.com/plexusone/systemspec-credential v0.4.0
+	github.com/plexusone/systemspec-runbook v0.1.0
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/mod v0.43.0
 	golang.org/x/net v0.63.0
@@ -42,6 +43,7 @@ require (
 	github.com/tidwall/match v1.2.0 // indirect
 	github.com/tidwall/pretty v1.3.0 // indirect
 	github.com/tidwall/sjson v1.2.11 // indirect
+	github.com/yuin/goldmark v1.8.7 // indirect
 	golang.org/x/crypto v0.59.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
 	golang.org/x/term v0.48.0 // indirect
