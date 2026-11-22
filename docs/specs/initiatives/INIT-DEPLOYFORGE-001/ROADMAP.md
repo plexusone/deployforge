@@ -59,7 +59,7 @@ Phases group the work; each phase's status follows from its items.
 | RMI-DEPLOYFORGE-024 | `deploy unpushed`: commits live releases were built from that are on no remote branch | done |
 | RMI-DEPLOYFORGE-025 | Local npm packages in a local build, packed from their checkouts | done |
 | RMI-DEPLOYFORGE-026 | Fleet checks: TLS minimum version and the like, each passing or failing | planned |
-| RMI-DEPLOYFORGE-027 | `db copy`: a stack's databases copied between servers, with row counts compared | planned |
+| RMI-DEPLOYFORGE-027 | `db copy`: a stack's databases copied between servers, with row counts compared, and its parameters promoted | done |
 
 ## Phase 7: The fleet document as the source
 

@@ -63,6 +63,7 @@ Your repository keeps the configuration; deployforge is the binary.
 | `ledger import <app> <stack> --from <file>` | Bring in another tool's ledger, checking every entry |
 | `db roles plan\|apply\|verify <app> <stack>` | Provision a stack's databases and roles |
 | `db snapshot plan\|apply\|verify\|list` | Snapshot the database server |
+| `db copy run\|verify\|promote <app> <stack>` | Move a stack's databases to another server: copy, compare row counts, switch its parameters |
 | `zones validate\|verify\|get\|page\|schema` | Check DNS zones against their name servers |
 | `zones harden plan\|apply\|verify` | Apply the security baseline to Cloudflare zones |
 | `origin-cert install\|issue\|list\|revoke` | Cloudflare origin certificates, made on the host |

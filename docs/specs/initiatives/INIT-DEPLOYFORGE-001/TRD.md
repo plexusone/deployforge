@@ -58,6 +58,7 @@ deployforge deploy ship app prod
 | `zones`, `zoneharden` | The zones document and its verification; the security baseline through Cloudflare's API |
 | `origincert` | Issue, list and revoke origin certificates, made on the host |
 | `dbroles`, `dbsnapshot` | Database and role plans with SCRAM verifiers and connection limits; snapshots of a Lightsail server |
+| `dbcopy` | A stack's databases copied to another server with pg_dump and psql in one transaction, row counts compared, and its parameters promoted |
 | `deploy/preflight` | Before a deploy, the registry's secrets under the stack's prefix checked by name in the parameter store |
 | `stackiam` | Each stack's parameter-store IAM policy and operators' group: plan, apply, verify |
 | `cli` | The Cobra command tree, mountable by a host tool |
