@@ -12,7 +12,7 @@ require (
 	github.com/cloudflare/cloudflare-go/v7 v7.15.0
 	github.com/grokify/pgutil v0.2.0
 	github.com/invopop/jsonschema v0.14.0
-	github.com/plexusone/credforge v0.9.0
+	github.com/plexusone/credforge v0.10.0
 	github.com/plexusone/systemspec-credential v0.4.0
 	github.com/plexusone/systemspec-runbook v0.2.0
 	github.com/spf13/cobra v1.10.2
