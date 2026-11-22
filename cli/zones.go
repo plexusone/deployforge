@@ -10,6 +10,7 @@ import (
 
 	"github.com/plexusone/deployforge/deploy/cfranges"
 	"github.com/plexusone/deployforge/fleet"
+	"github.com/plexusone/deployforge/tlsmin"
 	"github.com/plexusone/deployforge/zones"
 )
 
@@ -172,6 +173,30 @@ func zonesCmd(loadFleet func() (*fleet.Fleet, error)) *cobra.Command {
 	page.Flags().StringVarP(&pageOut, "output", "o", "", "file to write; standard output when empty")
 	root.AddCommand(page)
 	root.AddCommand(hardenCmd(load))
+	root.AddCommand(&cobra.Command{
+		Use:   "tls [<host>...]",
+		Short: "Check from outside that each host refuses TLS 1.1 and accepts TLS 1.2; default every live stack's host names",
+		RunE: func(c *cobra.Command, hosts []string) error {
+			if len(hosts) == 0 {
+				f, err := loadFleet()
+				if err != nil {
+					return err
+				}
+				hosts = liveHostNames(f)
+			}
+			var errs []error
+			for _, h := range hosts {
+				if err := tlsmin.Check(c.Context(), h, nil); err != nil {
+					errs = append(errs, err)
+					continue
+				}
+				if _, err := fmt.Fprintf(c.OutOrStdout(), "%s refuses TLS 1.1 and accepts TLS 1.2\n", h); err != nil {
+					return err
+				}
+			}
+			return errors.Join(errs...)
+		},
+	})
 	return root
 }
 
@@ -185,4 +210,17 @@ func writeOut(c *cobra.Command, path string, data []byte) error {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 	return nil
+}
+
+// liveHostNames are the host names of every live stack, in fleet order.
+func liveHostNames(f *fleet.Fleet) []string {
+	var out []string
+	for _, a := range f.Apps {
+		for _, stack := range f.StackNames(a) {
+			if s := a.Stacks[stack]; s.Status == fleet.Live {
+				out = append(out, s.Hosts...)
+			}
+		}
+	}
+	return out
 }
