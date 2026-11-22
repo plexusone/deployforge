@@ -60,6 +60,7 @@ deployforge deploy ship app prod
 | `origincert` | Issue, list and revoke origin certificates, made on the host |
 | `dbroles`, `dbsnapshot` | Database and role plans with SCRAM verifiers and connection limits; snapshots of a Lightsail server |
 | `dbcopy` | A stack's databases copied to another server with pg_dump and psql in one transaction, row counts compared, and its parameters promoted |
+| `credpage` | One app stack's credentials as an HTML page: what is needed, how each is made, what is recorded, and the setup runbook |
 | `deploy/preflight` | Before a deploy, the registry's secrets under the stack's prefix checked by name in the parameter store |
 | `stackiam` | Each stack's parameter-store IAM policy and operators' group: plan, apply, verify |
 | `cli` | The Cobra command tree, mountable by a host tool |

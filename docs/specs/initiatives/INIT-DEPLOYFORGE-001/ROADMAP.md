@@ -50,6 +50,7 @@ Phases group the work; each phase's status follows from its items.
 | RMI-DEPLOYFORGE-020 | Pre-flight in `ship`: every secret the registry stores under the stack's prefix is in the parameter store before packaging | done |
 | RMI-DEPLOYFORGE-021 | `iam`: a parameter-store IAM policy and operators' group per stack: plan, apply, verify | done |
 | RMI-DEPLOYFORGE-022 | `credentials generate`: random values and keys made where missing, through credforge | done |
+| RMI-DEPLOYFORGE-029 | `credentials setup` and `credentials page`: a stack's credentials as a runbook to run, and as an HTML page of what is needed, how each is made, what is recorded and how to set them up | done |
 
 ## Phase 6: Taking over running stacks
 

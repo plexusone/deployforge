@@ -69,6 +69,8 @@ Your repository keeps the configuration; deployforge is the binary.
 | `zones tls [<host>...]` | Check from outside that each host refuses TLS 1.1 and accepts TLS 1.2 |
 | `origin-cert install\|issue\|list\|revoke` | Cloudflare origin certificates, made on the host |
 | `credentials check\|generate\|install\|review\|status\|record\|report\|validate\|…` | The fleet's credential registry: observe the stores, generate or install a value, review, record and report |
+| `credentials setup --system <app> --env <stack> list\|show\|run\|verify\|doc` | Set a stack's credentials up step by step, from a runbook built from the registry |
+| `credentials page <app> <stack>` | An HTML page of what the stack's credentials are, how each is made, whether it is recorded, and how to set them up |
 | `iam plan\|apply\|verify [<app> <stack>]…` | Each stack's parameter-store IAM policy and operators' group |
 
 ## Quick Start
