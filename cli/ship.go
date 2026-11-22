@@ -25,10 +25,10 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer f
 	openStore func(*cobra.Command) (secrets.Store, error), openLightsail func(*cobra.Command) (dbsnapshot.API, error),
 	preflight func(c *cobra.Command, f *fleet.Fleet, a fleet.App, stack string) error) *cobra.Command {
 	var tag, repo, config, ref, script, selfcheck string
-	var with, allowUnpushed []string
+	var with, withWeb, allowUnpushed []string
 	var noFetch, local, skipPublic, noSnapshot, noPreflight bool
 	cmd := &cobra.Command{
-		Use:   "ship <app> <stack> (--tag vX.Y.Z | --local [--with <repo>[@ref]]...)",
+		Use:   "ship <app> <stack> (--tag vX.Y.Z | --local [--with <repo>[@ref]]... [--with-web <repo>[@ref]]...)",
 		Short: "Package the app in a temporary worktree, deploy it, and check each host name",
 		Long: "ship is a routine deploy in one command. It packages the app with its release script in a\n" +
 			"temporary git worktree, so the checkout is left as it is, deploys it as deploy release does with\n" +
@@ -43,7 +43,9 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer f
 			"With --tag it fetches and packages the app's release tag, with GOWORK off. With --local it packages\n" +
 			"the app's local --ref (default main) instead, untagged, and each --with repository from its own\n" +
 			"checkout's local commit ($GOPATH/src/<repo>; main unless @ref is given) through a generated\n" +
-			"go.work. The archive and the ledger name every upstream commit used. Every commit a local build\n" +
+			"go.work. Each --with-web repository's npm packages that the app's front end uses are built and packed\n" +
+			"from its local commit with pnpm and installed in their place, in the temporary worktree only.\n" +
+			"The archive and the ledger name every upstream commit used. Every commit a local build\n" +
 			"uses must be on a remote branch, except --allow-unpushed repositories.",
 		Args: cobra.ExactArgs(2),
 		RunE: func(c *cobra.Command, args []string) (err error) {
@@ -62,8 +64,8 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer f
 			if local == (tag != "") {
 				return errors.New("ship: give either --tag or --local")
 			}
-			if !local && len(with) > 0 {
-				return errors.New("ship: --with needs --local")
+			if !local && len(with)+len(withWeb) > 0 {
+				return errors.New("ship: --with and --with-web need --local")
 			}
 			if config == "" {
 				config = filepath.Join("stacks", app, stack, "config.yaml")
@@ -83,6 +85,10 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer f
 				return err
 			}
 			ups, err := upstreams(with)
+			if err != nil {
+				return err
+			}
+			webUps, err := upstreams(withWeb)
 			if err != nil {
 				return err
 			}
@@ -115,7 +121,7 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer f
 			}
 			p, err := ship.Build(c.Context(), ship.Options{
 				App: app, Repo: repo, Tag: tag, Deployforge: self, Fleet: fleetAbs, Script: script,
-				Fetch: !noFetch, Local: local, Ref: ref, Upstreams: ups,
+				Fetch: !noFetch, Local: local, Ref: ref, Upstreams: ups, WebUpstreams: webUps,
 				RequirePushed: local, AllowUnpushed: allow, Log: c.ErrOrStderr(),
 			})
 			if err != nil {
@@ -184,6 +190,7 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer f
 	fl.BoolVar(&local, "local", false, "package a local commit, untagged, instead of a tag")
 	fl.StringVar(&ref, "ref", "", "with --local, the app's branch or commit; default main")
 	fl.StringArrayVar(&with, "with", nil, "with --local, an upstream module's repository, as host/org/repo[@ref], built from its local checkout; repeat for each")
+	fl.StringArrayVar(&withWeb, "with-web", nil, "with --local, a repository whose npm packages the front end uses, packed from its local checkout, as host/org/repo[@ref]; repeat for each")
 	fl.StringArrayVar(&allowUnpushed, "allow-unpushed", nil, "an upstream repository a local build may take from an unpushed commit; repeat for each")
 	fl.StringVar(&repo, "repo", "", "the app's checkout; default $GOPATH/src/<repo>")
 	fl.StringVar(&config, "config", "", "the stack's config.yaml; default stacks/<app>/<stack>/config.yaml")

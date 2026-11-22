@@ -63,6 +63,9 @@ type Options struct {
 	Ref string
 	// Upstreams are the Go modules a local build takes from local commits.
 	Upstreams []Upstream
+	// WebUpstreams are the repositories whose npm packages a local build
+	// packs from local commits for the app's front end.
+	WebUpstreams []Upstream
 	// RequirePushed refuses a local build from a commit that is on no
 	// remote branch of its checkout, after fetching origin, except for the
 	// repositories AllowUnpushed names.
@@ -129,7 +132,7 @@ func Build(ctx context.Context, o Options) (_ *Package, err error) {
 		if !tagPattern.MatchString(o.Tag) {
 			return nil, fmt.Errorf("ship: %q is not a release tag such as v1.2.3", o.Tag)
 		}
-		if len(o.Upstreams) > 0 {
+		if len(o.Upstreams)+len(o.WebUpstreams) > 0 {
 			return nil, errors.New("ship: upstreams from local commits need a local build")
 		}
 	}
@@ -192,6 +195,9 @@ func Build(ctx context.Context, o Options) (_ *Package, err error) {
 	gowork := "off"
 	if o.Local {
 		if gowork, err = p.workspace(o.Upstreams); err != nil {
+			return nil, err
+		}
+		if err := p.webInputs(ctx, o.WebUpstreams, o.Log); err != nil {
 			return nil, err
 		}
 		args = append(args, "--allow-untagged")
@@ -307,8 +313,8 @@ func resolveUpstream(u Upstream) (string, error) {
 	return commit, nil
 }
 
-// addInput records an upstream commit once; a repository named twice must
-// resolve to the same commit.
+// addInput records an upstream commit once; a repository named for both Go
+// and web must resolve to the same commit.
 func (p *Package) addInput(repo, commit string) error {
 	if prev, ok := p.commits[repo]; ok {
 		if prev != commit {
@@ -328,7 +334,7 @@ func (p *Package) addInput(repo, commit string) error {
 func requirePushed(o Options, commit string) error {
 	type check struct{ repo, dir, commit string }
 	checks := []check{{repo: "the app", dir: o.Repo, commit: commit}}
-	for _, u := range o.Upstreams {
+	for _, u := range append(append([]Upstream(nil), o.Upstreams...), o.WebUpstreams...) {
 		if o.AllowUnpushed[u.Repo] {
 			continue
 		}
