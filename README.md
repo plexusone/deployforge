@@ -56,7 +56,9 @@ Your repository keeps the configuration; deployforge is the binary.
 | `caddyfile <host>`, `caddy install <host>` | Render a host's Caddyfile, and install it after Caddy validates it there |
 | `release package <app>` | Package a clean, tagged checkout |
 | `deploy ship\|release\|rollback\|unlock <app> <stack>` | Deploy, roll back, or clear a stale lock |
+| `deploy status <app> <stack>` | The live release, releases kept and lock on the host, against the ledger |
 | `ledger record\|show\|current` | Record and read the deploy ledger |
+| `ledger import <app> <stack> --from <file>` | Bring in another tool's ledger, checking every entry |
 | `db roles plan\|apply\|verify <app> <stack>` | Provision a stack's databases and roles |
 | `db snapshot plan\|apply\|verify\|list` | Snapshot the database server |
 | `zones validate\|verify\|get\|page\|schema` | Check DNS zones against their name servers |
@@ -92,6 +94,23 @@ The app's repository has a release script, `ops/host/release.sh` by
 default, that builds the app for linux/amd64 and runs
 `$DEPLOYFORGE release package <app> --fleet $DEPLOYFORGE_FLEET --repo . --from <build dir>`
 with the arguments it was given.
+
+## Taking over a running stack
+
+A stack another tool deployed with the same layout (`/opt/<unit>/releases`,
+`current` and `/etc/<unit>/`) can move to deployforge without a redeploy:
+
+```bash
+# Bring in its ledger; --app-field names the field that holds the app.
+deployforge ledger import example-app prod --from old/example-app.jsonl --app-field site
+# The host and the ledger must agree on the live release.
+deployforge deploy status example-app prod
+# The next deploy takes the lock and starts the audit log.
+deployforge deploy ship example-app prod --tag v1.2.3
+```
+
+The other tool takes no deploy lock, so once a stack has moved, deploy it
+only with deployforge.
 
 ## License
 

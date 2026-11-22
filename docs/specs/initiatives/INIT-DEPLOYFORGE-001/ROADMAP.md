@@ -55,7 +55,7 @@ Phases group the work; each phase's status follows from its items.
 
 | ID | Item | Status |
 |---|---|---|
-| RMI-DEPLOYFORGE-023 | Adopt a stack another tool deployed: its release directories, `current` link and lock recognized, its ledger imported | planned |
+| RMI-DEPLOYFORGE-023 | Adopt a stack another tool deployed: `ledger import` with a renamed app field, and `deploy status` comparing the host's live release, releases kept and lock with the ledger | done |
 | RMI-DEPLOYFORGE-024 | `deploy unpushed`: commits live releases were built from that are on no remote branch | planned |
 | RMI-DEPLOYFORGE-025 | Local npm packages in a local build, packed from their checkouts | planned |
 | RMI-DEPLOYFORGE-026 | Fleet checks: TLS minimum version and the like, each passing or failing | planned |

@@ -160,6 +160,11 @@ per-zone overrides.
   and readiness again; the failure is reported with the step that failed.
 - **Audit:** one JSON line per action in the app's directory on the host.
 - **Ledger:** on the operator's machine, after success.
+- **Status:** a read-only request returns the live release, the release
+  directories kept, the lock's holder and whether the audit log exists; it
+  takes no lock and is not audited. `deploy status` compares it with the
+  ledger, which `ledger import` can bring in from another tool, every entry
+  checked as `ledger record` checks it.
 
 ## Hooks
 
