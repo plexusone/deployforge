@@ -334,6 +334,26 @@ func (d *Deployer) Unlock(ctx context.Context, app, stack string) error {
 	return nil
 }
 
+// Status reads what is on a stack's host: the live release, the releases
+// kept and the deploy lock. It changes nothing and records nothing.
+func (d *Deployer) Status(ctx context.Context, app, stack string) (*onhost.Status, error) {
+	if err := d.check(); err != nil {
+		return nil, err
+	}
+	t, err := target.Resolve(d.Fleet, app, stack)
+	if err != nil {
+		return nil, err
+	}
+	res, err := d.run(ctx, t, onhost.Request{Action: onhost.ActionStatus, Target: t, Operator: d.Operator}, "")
+	if err != nil {
+		return nil, err
+	}
+	if res.Status == nil {
+		return nil, errors.New("deployer: the host returned no status; is its deployforge older than this one?")
+	}
+	return res.Status, nil
+}
+
 // run uploads deployforge's linux build (and the archive) to the target's
 // host, runs it as root with the request on standard input, and reads its
 // result from standard output.

@@ -94,6 +94,8 @@ type Result struct {
 	Previous string `json:"previous,omitempty"`
 	// Selfcheck is the self-check's outcome, when it ran.
 	Selfcheck *SelfcheckResult `json:"selfcheck,omitempty"`
+	// Status is what a status request found.
+	Status *Status `json:"status,omitempty"`
 }
 
 var (
@@ -115,7 +117,7 @@ func (r Request) Validate() error {
 	if !operatorName.MatchString(r.Operator) {
 		return fmt.Errorf("onhost: operator %q must be 1 to 64 letters, digits and . _ @ -", r.Operator)
 	}
-	if r.Action == ActionUnlock {
+	if r.Action == ActionUnlock || r.Action == ActionStatus {
 		return nil
 	}
 	if r.HealthTimeout < 1 || r.HealthTimeout > 600 {
@@ -153,7 +155,7 @@ func (r Request) Validate() error {
 			return errors.New("onhost: a rollback runs no self-check")
 		}
 	default:
-		return fmt.Errorf("onhost: action %q must be %s, %s or %s", r.Action, ActionRelease, ActionRollback, ActionUnlock)
+		return fmt.Errorf("onhost: action %q must be %s, %s, %s or %s", r.Action, ActionRelease, ActionRollback, ActionUnlock, ActionStatus)
 	}
 	return nil
 }
@@ -239,6 +241,11 @@ func (h *Host) Run(ctx context.Context, r Request, work string) (res Result, err
 		return Result{}, err
 	}
 	l := h.layout(r.Target)
+	if r.Action == ActionStatus {
+		// A status changes nothing, so it is not audited.
+		st, err := h.status(l)
+		return Result{Release: statusLive(st), Status: st}, err
+	}
 	defer func() {
 		// A request refused for a held lock changed nothing, but who tried is
 		// worth knowing too.
@@ -572,4 +579,11 @@ func union(lists ...[]string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func statusLive(st *Status) string {
+	if st == nil {
+		return ""
+	}
+	return st.Live
 }
