@@ -90,7 +90,8 @@ func TestShipRefusesWhatItCannotShip(t *testing.T) {
 		"a planned stack":     {[]string{"deploy", "ship", "example-app", "staging", "--tag", "v1.0.0"}, `is "planned"`},
 		"no tag and no local": {[]string{"deploy", "ship", "example-app", "prod"}, "either --tag or --local"},
 		"both":                {[]string{"deploy", "ship", "example-app", "prod", "--tag", "v1.0.0", "--local"}, "either --tag or --local"},
-		"with without local":  {[]string{"deploy", "ship", "example-app", "prod", "--tag", "v1.0.0", "--with", "github.com/a/b"}, "--with needs --local"},
+		"with without local":  {[]string{"deploy", "ship", "example-app", "prod", "--tag", "v1.0.0", "--with", "github.com/a/b"}, "need --local"},
+		"web without local":   {[]string{"deploy", "ship", "example-app", "prod", "--tag", "v1.0.0", "--with-web", "github.com/a/b"}, "need --local"},
 		"no config":           {[]string{"deploy", "ship", "example-app", "prod", "--tag", "v1.0.0", "--config", "/nonexistent/config.yaml"}, "the stack's config"},
 		"an unknown app":      {[]string{"deploy", "ship", "other", "prod", "--tag", "v1.0.0"}, `no app "other"`},
 	} {
