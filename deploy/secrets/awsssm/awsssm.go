@@ -95,3 +95,15 @@ func (s *SSM) Put(ctx context.Context, name, value string) error {
 	}
 	return nil
 }
+
+// Set writes a SecureString parameter with the account's default key,
+// creating it or replacing its value.
+func (s *SSM) Set(ctx context.Context, name, value string) error {
+	_, err := s.client.PutParameter(ctx, &ssm.PutParameterInput{
+		Name: aws.String(name), Value: aws.String(value), Type: types.ParameterTypeSecureString, Overwrite: aws.Bool(true),
+	})
+	if err != nil {
+		return fmt.Errorf("set %s: %w", name, err)
+	}
+	return nil
+}
