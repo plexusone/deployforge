@@ -22,10 +22,11 @@ import (
 // shipCmd is a whole routine deploy in one command: package the tag in a
 // temporary worktree, deploy it, and check every host name from outside.
 func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer func(*cobra.Command) (*deployer.Deployer, error),
-	openStore func(*cobra.Command) (secrets.Store, error), openLightsail func(*cobra.Command) (dbsnapshot.API, error)) *cobra.Command {
+	openStore func(*cobra.Command) (secrets.Store, error), openLightsail func(*cobra.Command) (dbsnapshot.API, error),
+	preflight func(c *cobra.Command, f *fleet.Fleet, a fleet.App, stack string) error) *cobra.Command {
 	var tag, repo, config, ref, script, selfcheck string
 	var with, allowUnpushed []string
-	var noFetch, local, skipPublic, noSnapshot bool
+	var noFetch, local, skipPublic, noSnapshot, noPreflight bool
 	cmd := &cobra.Command{
 		Use:   "ship <app> <stack> (--tag vX.Y.Z | --local [--with <repo>[@ref]]...)",
 		Short: "Package the app in a temporary worktree, deploy it, and check each host name",
@@ -36,6 +37,9 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer f
 			"Before deploying an app's primary stack that has databases, it takes a snapshot of the fleet's database\n" +
 			"server when the server is a Lightsail database, and waits until it is available, so a migrate that goes\n" +
 			"wrong can be undone by restoring it; a snapshot that fails stops the deploy. --no-db-snapshot skips it.\n\n" +
+			"When the fleet document names a credential registry, it first checks that every secret the registry\n" +
+			"stores under the stack's prefix is in the parameter store, by name, and stops before packaging when\n" +
+			"one is missing. --no-preflight skips it.\n\n" +
 			"With --tag it fetches and packages the app's release tag, with GOWORK off. With --local it packages\n" +
 			"the app's local --ref (default main) instead, untagged, and each --with repository from its own\n" +
 			"checkout's local commit ($GOPATH/src/<repo>; main unless @ref is given) through a generated\n" +
@@ -89,6 +93,14 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer f
 			say := func(format string, args ...any) error {
 				_, err := fmt.Fprintf(c.OutOrStdout(), format+"\n", args...)
 				return err
+			}
+			if f.Credentials != nil && !noPreflight {
+				if err := say("checking %s/%s's secrets against the credential registry", app, stack); err != nil {
+					return err
+				}
+				if err := preflight(c, f, a, stack); err != nil {
+					return err
+				}
 			}
 			if err := say("packaging %s in a temporary worktree", app); err != nil {
 				return err
@@ -180,6 +192,7 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer f
 	fl.BoolVar(&noFetch, "no-fetch", false, "do not fetch the tag from origin first")
 	fl.BoolVar(&skipPublic, "skip-public-check", false, "do not check the host names from outside afterwards")
 	fl.BoolVar(&noSnapshot, "no-db-snapshot", false, "do not snapshot the database server before deploying the primary stack")
+	fl.BoolVar(&noPreflight, "no-preflight", false, "do not check the stack's secrets against the credential registry first")
 	return cmd
 }
 

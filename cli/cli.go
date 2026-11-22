@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/plexusone/credforge"
+	"github.com/plexusone/credforge/targets"
 	"github.com/spf13/cobra"
 
 	"github.com/plexusone/deployforge/dbroles"
@@ -30,6 +32,7 @@ import (
 	"github.com/plexusone/deployforge/provenance"
 	"github.com/plexusone/deployforge/release"
 	"github.com/plexusone/deployforge/schema"
+	"github.com/plexusone/deployforge/stackiam"
 )
 
 // Options configure the command tree.
@@ -52,6 +55,12 @@ type Options struct {
 	// OriginCA opens Cloudflare's Origin CA; the official client with the
 	// token in CLOUDFLARE_API_TOKEN when nil.
 	OriginCA func() (origincert.API, error)
+	// IAM opens the clients the iam command uses; IAM and STS with the
+	// default AWS configuration when nil.
+	IAM func(c *cobra.Command) (stackiam.Clients, error)
+	// CredentialConnector reaches the credential stores for the check
+	// before a deploy; credforge's, through the targets, when nil.
+	CredentialConnector func(*targets.File) credforge.Connector
 }
 
 // originOpener is the option's Origin CA, or Cloudflare's.
@@ -60,6 +69,15 @@ func originOpener(o Options) func() (origincert.API, error) {
 		return o.OriginCA
 	}
 	return originAPI
+}
+
+// iamOpener is the option's opener, or IAM and STS with the default AWS
+// configuration.
+func iamOpener(o Options) func(c *cobra.Command) (stackiam.Clients, error) {
+	if o.IAM != nil {
+		return o.IAM
+	}
+	return func(c *cobra.Command) (stackiam.Clients, error) { return iamClients(c.Context()) }
 }
 
 // lightsailOpener is the option's opener, or Lightsail with the default
@@ -103,6 +121,8 @@ func New(o Options) *cobra.Command {
 		releaseCmd(load),
 		deployCmd(load, &fleetPath, o),
 		ledgerCmd(load),
+		credentialsCmd(load, &fleetPath),
+		iamCmd(load, iamOpener(o)),
 		onHostCmd(),
 	)
 	return root
@@ -356,7 +376,7 @@ Environment:
 			return err
 		},
 	})
-	root.AddCommand(shipCmd(load, fleetPath, newDeployer, openStore, lightsailOpener(o)))
+	root.AddCommand(shipCmd(load, fleetPath, newDeployer, openStore, lightsailOpener(o), preflightFor(o, fleetPath)))
 	root.AddCommand(&cobra.Command{
 		Use:   "unlock <app> <stack>",
 		Short: "Remove the stack's deploy lock, left by a deploy that was cut off",
