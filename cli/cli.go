@@ -27,6 +27,7 @@ import (
 	"github.com/plexusone/deployforge/deploy/secrets"
 	"github.com/plexusone/deployforge/deploy/secrets/awsssm"
 	"github.com/plexusone/deployforge/deploy/systemd"
+	"github.com/plexusone/deployforge/deploy/unpushed"
 	"github.com/plexusone/deployforge/fleet"
 	"github.com/plexusone/deployforge/ledger"
 	"github.com/plexusone/deployforge/origincert"
@@ -394,6 +395,51 @@ Environment:
 			return err
 		},
 	})
+	var fetch bool
+	unpushedC := &cobra.Command{
+		Use:   "unpushed",
+		Short: "List the commits live releases were built from that are on no remote branch",
+		Long: "unpushed reads each stack's live release from the ledger and checks the app's commit and every\n" +
+			"upstream input a local build used against the remote branches of its checkout under $GOPATH/src.\n" +
+			"It prints what is not pushed, or cannot be checked, and exits non-zero if anything is.",
+		Args: cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			f, err := load()
+			if err != nil {
+				return err
+			}
+			commits, err := unpushed.Live(f, unpushed.Options{LedgerDir: ledgerDir, Src: gopathSrc(), Fetch: fetch})
+			if err != nil {
+				return err
+			}
+			out := c.OutOrStdout()
+			bad := 0
+			for _, cm := range commits {
+				if cm.Pushed && cm.Err == nil {
+					continue
+				}
+				bad++
+				what := "app"
+				if cm.Input {
+					what = "input"
+				}
+				status := "not pushed"
+				if cm.Err != nil {
+					status = "unchecked: " + cm.Err.Error()
+				}
+				if _, err := fmt.Fprintf(out, "%s/%s  %-5s %s@%s  %s\n", cm.App, cm.Stack, what, cm.Repo, shortCommit(cm.Commit), status); err != nil {
+					return err
+				}
+			}
+			if bad > 0 {
+				return fmt.Errorf("%d commit(s) that live releases run are on no remote branch; push them", bad)
+			}
+			_, err = fmt.Fprintf(out, "every commit live releases run is on a remote branch (%d checked)\n", len(commits))
+			return err
+		},
+	}
+	unpushedC.Flags().BoolVar(&fetch, "fetch", false, "fetch each checkout's origin first")
+	root.AddCommand(unpushedC)
 	root.AddCommand(&cobra.Command{
 		Use:   "status <app> <stack>",
 		Short: "Show the stack's live release, the releases kept and its lock, against the ledger",
@@ -419,6 +465,13 @@ Environment:
 		},
 	})
 	return root
+}
+
+func shortCommit(commit string) string {
+	if len(commit) > 12 {
+		return commit[:12]
+	}
+	return commit
 }
 
 // mustApp is an app Status already resolved.
