@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -50,6 +51,28 @@ type Fleet struct {
 	// DatabaseServer is the PostgreSQL server the apps' databases are on,
 	// when deployforge provisions their roles.
 	DatabaseServer *DatabaseServer `json:"databaseServer,omitempty" jsonschema:"description=The PostgreSQL server the apps' databases are on\\, when deployforge provisions their roles"`
+	// Credentials names the credential registry the apps' secrets are
+	// described in, for deployforge credentials and the check before a
+	// deploy.
+	Credentials *Credentials `json:"credentials,omitempty" jsonschema:"description=The credential registry the apps' secrets are described in\\, for deployforge credentials and the check before a deploy"`
+}
+
+// Credentials names the files of a credential registry: the registry, its
+// event log, review decisions and how its stores are reached. Paths are
+// relative to the fleet document's directory.
+type Credentials struct {
+	// Registry is the registry file (systemspec-credential's format).
+	Registry string `json:"registry" jsonschema:"description=The credential registry file\\, relative to the fleet document,minLength=1"`
+	// Events is the event log; events.json beside the registry when empty.
+	Events string `json:"events,omitempty" jsonschema:"description=The event log\\, relative to the fleet document; events.json beside the registry when empty"`
+	// Reviews holds review decisions; reviews.json beside the registry
+	// when empty.
+	Reviews string `json:"reviews,omitempty" jsonschema:"description=The review decisions\\, relative to the fleet document; reviews.json beside the registry when empty"`
+	// Targets is a credforge targets file saying how each store is
+	// reached. When empty, GitHub Actions secrets are reached with
+	// GITHUB_TOKEN or GH_TOKEN and SSM parameters with the default AWS
+	// configuration. Either way every app's repository is scanned.
+	Targets string `json:"targets,omitempty" jsonschema:"description=A credforge targets file\\, relative to the fleet document; when empty GitHub is reached with GITHUB_TOKEN or GH_TOKEN and SSM with the default AWS configuration"`
 }
 
 // PortRange is an inclusive range of loopback ports.
@@ -417,6 +440,16 @@ func (f *Fleet) Validate() error {
 	}
 	if len(f.Hosts) == 0 {
 		bad("hosts", "needs at least one host")
+	}
+	if c := f.Credentials; c != nil {
+		if strings.TrimSpace(c.Registry) == "" {
+			bad("credentials", "needs a registry")
+		}
+		for _, p := range []struct{ name, path string }{{"registry", c.Registry}, {"events", c.Events}, {"reviews", c.Reviews}, {"targets", c.Targets}} {
+			if filepath.IsAbs(p.path) {
+				bad("credentials", "%s must be relative to the fleet document", p.name)
+			}
+		}
 	}
 
 	apps, units := map[string]bool{}, map[string]string{}

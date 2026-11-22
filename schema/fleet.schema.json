@@ -76,6 +76,32 @@
         "stacks"
       ]
     },
+    "Credentials": {
+      "properties": {
+        "registry": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The credential registry file, relative to the fleet document"
+        },
+        "events": {
+          "type": "string",
+          "description": "The event log, relative to the fleet document; events.json beside the registry when empty"
+        },
+        "reviews": {
+          "type": "string",
+          "description": "The review decisions, relative to the fleet document; reviews.json beside the registry when empty"
+        },
+        "targets": {
+          "type": "string",
+          "description": "A credforge targets file, relative to the fleet document; when empty GitHub is reached with GITHUB_TOKEN or GH_TOKEN and SSM with the default AWS configuration"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "registry"
+      ]
+    },
     "Database": {
       "properties": {
         "name": {
@@ -209,6 +235,10 @@
         "databaseServer": {
           "$ref": "#/$defs/DatabaseServer",
           "description": "The PostgreSQL server the apps' databases are on, when deployforge provisions their roles"
+        },
+        "credentials": {
+          "$ref": "#/$defs/Credentials",
+          "description": "The credential registry the apps' secrets are described in, for deployforge credentials and the check before a deploy"
         }
       },
       "additionalProperties": false,
