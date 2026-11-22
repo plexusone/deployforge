@@ -55,6 +55,7 @@ deployforge deploy ship app prod
 | `deploy/systemd`, `deploy/host` | Render units and their sandbox, and the idempotent host-setup script |
 | `deploy/caddy`, `deploy/cfranges` | Render a host's Caddyfile; Cloudflare's published proxy ranges |
 | `ledger` | Append and read the per-stack JSON Lines ledger |
+| `tlsmin` | A host's minimum TLS version, checked from outside by offering TLS 1.1 and 1.2 |
 | `zones`, `zoneharden` | The zones document and its verification; the security baseline through Cloudflare's API |
 | `origincert` | Issue, list and revoke origin certificates, made on the host |
 | `dbroles`, `dbsnapshot` | Database and role plans with SCRAM verifiers and connection limits; snapshots of a Lightsail server |

@@ -66,6 +66,7 @@ Your repository keeps the configuration; deployforge is the binary.
 | `db copy run\|verify\|promote <app> <stack>` | Move a stack's databases to another server: copy, compare row counts, switch its parameters |
 | `zones validate\|verify\|get\|page\|schema` | Check DNS zones against their name servers |
 | `zones harden plan\|apply\|verify` | Apply the security baseline to Cloudflare zones |
+| `zones tls [<host>...]` | Check from outside that each host refuses TLS 1.1 and accepts TLS 1.2 |
 | `origin-cert install\|issue\|list\|revoke` | Cloudflare origin certificates, made on the host |
 | `credentials check\|generate\|install\|review\|status\|record\|report\|validate\|…` | The fleet's credential registry: observe the stores, generate or install a value, review, record and report |
 | `iam plan\|apply\|verify [<app> <stack>]…` | Each stack's parameter-store IAM policy and operators' group |
