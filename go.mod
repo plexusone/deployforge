@@ -14,13 +14,14 @@ require (
 	github.com/invopop/jsonschema v0.14.0
 	github.com/plexusone/credforge v0.9.0
 	github.com/plexusone/systemspec-credential v0.4.0
-	github.com/plexusone/systemspec-runbook v0.1.0
+	github.com/plexusone/systemspec-runbook v0.2.0
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/mod v0.43.0
 	golang.org/x/net v0.63.0
 )
 
 require (
+	github.com/a-h/templ v0.3.1118 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.21.3 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.20.9 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.12 // indirect

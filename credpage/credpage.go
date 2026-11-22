@@ -76,7 +76,7 @@ func Render(f *fleet.Fleet, app, stack string, reg *credspec.Registry, log *cred
 	})
 	data := page{
 		Title: app + " " + stack + " credentials", App: a, Stack: stack, Hosts: s.Hosts, Status: string(s.Status),
-		Rows: rows, Style: template.CSS(rb.Style), Generated: now().UTC().Format("2006-01-02 15:04 UTC"),
+		Rows: rows, Style: template.CSS(rb.Style), Script: template.JS(rb.Script), Generated: now().UTC().Format("2006-01-02 15:04 UTC"),
 	}
 	for _, r := range rows {
 		if r.Recorded != "" {
@@ -160,6 +160,7 @@ type page struct {
 	NoRunbook string
 	RunWith   string
 	Style     template.CSS
+	Script    template.JS
 	Generated string
 }
 
@@ -171,7 +172,6 @@ var tmpl = template.Must(template.New("page").Parse(`<!doctype html>
 <title>{{.Title}}</title>
 <style>
 {{.Style}}
-main { max-width: 72rem; }
 table.needs { display: table; width: 100%; table-layout: fixed; font-size: 0.92rem; }
 table.needs th:nth-child(1) { width: 28%; } table.needs th:nth-child(2) { width: 8%; }
 table.needs th:nth-child(3) { width: 20%; } table.needs th:nth-child(5) { width: 12%; }
@@ -204,6 +204,7 @@ table.needs code { word-break: break-all; }
 {{if .Runbook}}<p>Follow the steps below, or run each one: <code>{{.RunWith}}</code>. A step's checks read names, never values.</p>
 {{.Runbook}}{{else}}<p>{{.NoRunbook}}</p>{{end}}
 </main>
+<script>{{.Script}}</script>
 </body>
 </html>
 `))
