@@ -65,4 +65,4 @@ Phases group the work; each phase's status follows from its items.
 
 | ID | Item | Status |
 |---|---|---|
-| RMI-DEPLOYFORGE-028 | Every field a converted fleet needs, so the fleet document can be the file a fleet commits | planned |
+| RMI-DEPLOYFORGE-028 | Every field a converted fleet needs, so the fleet document can be the file a fleet commits: app `labels` for facts deployforge keeps but never acts on | done |

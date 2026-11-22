@@ -119,6 +119,10 @@ types with `invopop/jsonschema` and embedded.
 - **Databases belong to the stack,** each saying whether the app runs as
   a separate app role (`appRole`) or as the owner; nothing about databases
   is compiled in.
+- **Labels carry what deployforge does not act on:** an app's `labels`
+  are string facts, such as an owning organization or the kinds of
+  personal data it holds, kept for the tools around deployforge so the
+  fleet document can be the one file a fleet commits.
 - **Credentials are described, not configured here:** `credentials`
   names a registry file in systemspec-credential's format, with its event
   log, review decisions and an optional credforge targets file, each
