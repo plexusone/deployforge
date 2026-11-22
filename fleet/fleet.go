@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -148,6 +149,10 @@ type App struct {
 	Stacks map[string]Stack `json:"stacks" jsonschema:"description=The app's deployments by stack name\\, such as prod and staging,minProperties=1"`
 	// Notes explain choices about the app; JSON has no comments.
 	Notes string `json:"notes,omitempty" jsonschema:"description=Why the app is set up this way; JSON has no comments"`
+	// Labels are facts about the app that deployforge keeps but never acts
+	// on, for the tools around it, such as an owning organization or the
+	// kinds of personal data the app holds.
+	Labels map[string]string `json:"labels,omitempty" jsonschema:"description=Facts about the app that deployforge keeps but never acts on\\, for the tools around it"`
 }
 
 // Stack is one deployment of an app.
@@ -383,6 +388,7 @@ var (
 	hostPattern   = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z][a-z0-9-]*[a-z0-9]$`)
 	dbPattern     = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 	logPattern    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
+	labelPattern  = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9._/-]*$`)
 	pulumiName    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/-]*$`)
 	pulumiKey     = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]*$`)
 	paramPattern  = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_./-]*$`)
@@ -487,6 +493,11 @@ func (f *Fleet) Validate() error {
 		for _, l := range a.LogFiles {
 			if !logPattern.MatchString(l) {
 				bad(at, "log file %q must be a plain file name", l)
+			}
+		}
+		for _, k := range slices.Sorted(maps.Keys(a.Labels)) {
+			if !labelPattern.MatchString(k) {
+				bad(at, "label %q must start with a letter and hold letters, digits and . _ / -", k)
 			}
 		}
 		for _, stack := range f.StackNames(a) {

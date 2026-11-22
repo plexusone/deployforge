@@ -65,6 +65,13 @@
         "notes": {
           "type": "string",
           "description": "Why the app is set up this way; JSON has no comments"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object",
+          "description": "Facts about the app that deployforge keeps but never acts on, for the tools around it"
         }
       },
       "additionalProperties": false,
