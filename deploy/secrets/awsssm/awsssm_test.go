@@ -11,8 +11,9 @@ import (
 
 // fake serves two pages and checks the query.
 type fake struct {
-	t     *testing.T
-	calls int
+	t         *testing.T
+	calls     int
+	overwrite bool
 }
 
 func (f *fake) GetParametersByPath(_ context.Context, in *ssm.GetParametersByPathInput, _ ...func(*ssm.Options)) (*ssm.GetParametersByPathOutput, error) {
@@ -39,9 +40,10 @@ func (f *fake) GetParameter(_ context.Context, in *ssm.GetParameterInput, _ ...f
 }
 
 func (f *fake) PutParameter(_ context.Context, in *ssm.PutParameterInput, _ ...func(*ssm.Options)) (*ssm.PutParameterOutput, error) {
-	if aws.ToBool(in.Overwrite) || in.Type != types.ParameterTypeSecureString {
+	if in.Type != types.ParameterTypeSecureString {
 		f.t.Errorf("put %+v", in)
 	}
+	f.overwrite = aws.ToBool(in.Overwrite)
 	f.calls++
 	return &ssm.PutParameterOutput{}, nil
 }
@@ -55,8 +57,11 @@ func TestGetAndPut(t *testing.T) {
 	if _, ok, err := s.Get(context.Background(), "/missing"); err != nil || ok {
 		t.Errorf("a missing parameter: %v, %v", ok, err)
 	}
-	if err := s.Put(context.Background(), "/b", "x"); err != nil || f.calls != 1 {
-		t.Errorf("Put: %v", err)
+	if err := s.Put(context.Background(), "/b", "x"); err != nil || f.calls != 1 || f.overwrite {
+		t.Errorf("Put: %v, overwrite %v", err, f.overwrite)
+	}
+	if err := s.Set(context.Background(), "/b", "y"); err != nil || f.calls != 2 || !f.overwrite {
+		t.Errorf("Set: %v, overwrite %v", err, f.overwrite)
 	}
 }
 
