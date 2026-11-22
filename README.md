@@ -41,7 +41,8 @@ Your repository keeps the configuration; deployforge is the binary.
 - **Credentials:** the fleet document names a credential registry
   ([systemspec-credential](https://github.com/plexusone/systemspec-credential)
   format), checked, reported on and installed through
-  [credforge](https://github.com/plexusone/credforge). `ship` checks that
+  [credforge](https://github.com/plexusone/credforge), which also makes
+  random values and keys where they are missing. `ship` checks that
   every secret the registry stores under a stack's prefix is in the
   parameter store before it packages anything.
 - **Access per stack:** an IAM policy and an operators' group for each
@@ -65,7 +66,7 @@ Your repository keeps the configuration; deployforge is the binary.
 | `zones validate\|verify\|get\|page\|schema` | Check DNS zones against their name servers |
 | `zones harden plan\|apply\|verify` | Apply the security baseline to Cloudflare zones |
 | `origin-cert install\|issue\|list\|revoke` | Cloudflare origin certificates, made on the host |
-| `credentials check\|install\|review\|status\|record\|report\|validate\|…` | The fleet's credential registry: observe the stores, install a value, review, record and report |
+| `credentials check\|generate\|install\|review\|status\|record\|report\|validate\|…` | The fleet's credential registry: observe the stores, generate or install a value, review, record and report |
 | `iam plan\|apply\|verify [<app> <stack>]…` | Each stack's parameter-store IAM policy and operators' group |
 
 ## Quick Start
