@@ -113,7 +113,7 @@ func credentialsCmd(load func() (*fleet.Fleet, error), fleetPath *string) *cobra
 			return TargetsFor(f, cf.targets)
 		},
 	}
-	cmd.AddCommand(forgecli.Check(forge), forgecli.Install(forge), forgecli.Review(forge))
+	cmd.AddCommand(forgecli.Check(forge), forgecli.Generate(forge), forgecli.Install(forge), forgecli.Review(forge))
 	// The flags' defaults come from the fleet document, which is read once
 	// the command line, with --fleet, is parsed.
 	cmd.PersistentPreRunE = func(c *cobra.Command, _ []string) error {

@@ -12,8 +12,8 @@ require (
 	github.com/cloudflare/cloudflare-go/v7 v7.15.0
 	github.com/grokify/pgutil v0.2.0
 	github.com/invopop/jsonschema v0.14.0
-	github.com/plexusone/credforge v0.7.0
-	github.com/plexusone/systemspec-credential v0.3.0
+	github.com/plexusone/credforge v0.8.0
+	github.com/plexusone/systemspec-credential v0.4.0
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/mod v0.43.0
 	golang.org/x/net v0.63.0
