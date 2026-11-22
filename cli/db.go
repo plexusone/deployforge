@@ -18,7 +18,7 @@ import (
 func dbCmd(load func() (*fleet.Fleet, error), o Options) *cobra.Command {
 	root := &cobra.Command{
 		Use:   "db",
-		Short: "Provision app stacks' databases and roles",
+		Short: "Provision app stacks' databases and roles, move them between servers, and snapshot the server",
 	}
 	openParams := o.Params
 	if openParams == nil {
@@ -119,7 +119,7 @@ func dbCmd(load func() (*fleet.Fleet, error), o Options) *cobra.Command {
 			return verifyRoles(c, plan, srv.PSQL(sshKey))
 		},
 	})
-	root.AddCommand(roles, snapshotCmd(load, lightsailOpener(o)))
+	root.AddCommand(roles, copyCmd(load, openParams), snapshotCmd(load, lightsailOpener(o)))
 	return root
 }
 
