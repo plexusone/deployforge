@@ -272,3 +272,15 @@ func TestCredentials(t *testing.T) {
 		}
 	}
 }
+
+func TestLabels(t *testing.T) {
+	f := load(t)
+	f.Apps[0].Labels = map[string]string{"org": "example", "personalData": "adults,children"}
+	if err := f.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	f.Apps[0].Labels = map[string]string{"has space": "x"}
+	if err := f.Validate(); err == nil || !strings.Contains(err.Error(), `label "has space"`) {
+		t.Errorf("a bad label: %v", err)
+	}
+}
