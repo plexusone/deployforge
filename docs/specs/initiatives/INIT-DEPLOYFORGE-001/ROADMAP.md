@@ -41,3 +41,28 @@ Phases group the work; each phase's status follows from its items.
 |---|---|---|
 | RMI-DEPLOYFORGE-017 | Owner and app roles per database with connection limits and SCRAM verifiers, passwords in the parameter store | done |
 | RMI-DEPLOYFORGE-018 | Snapshots before a prod deploy and on demand | done |
+
+## Phase 5: Credentials and access
+
+| ID | Item | Status |
+|---|---|---|
+| RMI-DEPLOYFORGE-019 | `credentials`: the credential registry the fleet document names, with credforge's check, install and review and systemspec-credential's commands; targets from the fleet | done |
+| RMI-DEPLOYFORGE-020 | Pre-flight in `ship`: every secret the registry stores under the stack's prefix is in the parameter store before packaging | done |
+| RMI-DEPLOYFORGE-021 | `iam`: a parameter-store IAM policy and operators' group per stack: plan, apply, verify | done |
+| RMI-DEPLOYFORGE-022 | `credentials generate`: random values and keys made where missing, through credforge | planned |
+
+## Phase 6: Taking over running stacks
+
+| ID | Item | Status |
+|---|---|---|
+| RMI-DEPLOYFORGE-023 | Adopt a stack another tool deployed: its release directories, `current` link and lock recognized, its ledger imported | planned |
+| RMI-DEPLOYFORGE-024 | `deploy unpushed`: commits live releases were built from that are on no remote branch | planned |
+| RMI-DEPLOYFORGE-025 | Local npm packages in a local build, packed from their checkouts | planned |
+| RMI-DEPLOYFORGE-026 | Fleet checks: TLS minimum version and the like, each passing or failing | planned |
+| RMI-DEPLOYFORGE-027 | `db copy`: a stack's databases copied between servers, with row counts compared | planned |
+
+## Phase 7: The fleet document as the source
+
+| ID | Item | Status |
+|---|---|---|
+| RMI-DEPLOYFORGE-028 | Every field a converted fleet needs, so the fleet document can be the file a fleet commits | planned |

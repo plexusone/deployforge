@@ -57,6 +57,8 @@ deployforge deploy ship app prod
 | `zones`, `zoneharden` | The zones document and its verification; the security baseline through Cloudflare's API |
 | `origincert` | Issue, list and revoke origin certificates, made on the host |
 | `dbroles`, `dbsnapshot` | Database and role plans with SCRAM verifiers and connection limits; snapshots of a Lightsail server |
+| `deploy/preflight` | Before a deploy, the registry's secrets under the stack's prefix checked by name in the parameter store |
+| `stackiam` | Each stack's parameter-store IAM policy and operators' group: plan, apply, verify |
 | `cli` | The Cobra command tree, mountable by a host tool |
 
 Each CDN or cloud API is behind an interface in the package that uses it,
@@ -114,6 +116,12 @@ types with `invopop/jsonschema` and embedded.
 - **Databases belong to the stack,** each saying whether the app runs as
   a separate app role (`appRole`) or as the owner; nothing about databases
   is compiled in.
+- **Credentials are described, not configured here:** `credentials`
+  names a registry file in systemspec-credential's format, with its event
+  log, review decisions and an optional credforge targets file, each
+  relative to the fleet document. Without a targets file, GitHub is
+  reached with `GITHUB_TOKEN` or `GH_TOKEN` and SSM with the default AWS
+  configuration, and every app's repository is scanned.
 - **Addresses can come from outputs** of the tool that made the hosts,
   read through a provider (Pulumi first), so the document holds no IPs
   (RMI-DEPLOYFORGE-012; until then an address is an IP or host name).

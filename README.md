@@ -38,6 +38,14 @@ Your repository keeps the configuration; deployforge is the binary.
 - **Databases:** owner and app roles per database with connection limits
   and SCRAM verifiers, their passwords kept in the parameter store, and a
   snapshot of the server before deploying a primary stack.
+- **Credentials:** the fleet document names a credential registry
+  ([systemspec-credential](https://github.com/plexusone/systemspec-credential)
+  format), checked, reported on and installed through
+  [credforge](https://github.com/plexusone/credforge). `ship` checks that
+  every secret the registry stores under a stack's prefix is in the
+  parameter store before it packages anything.
+- **Access per stack:** an IAM policy and an operators' group for each
+  stack's parameter-store prefix.
 
 ## Commands
 
@@ -54,6 +62,8 @@ Your repository keeps the configuration; deployforge is the binary.
 | `zones validate\|verify\|get\|page\|schema` | Check DNS zones against their name servers |
 | `zones harden plan\|apply\|verify` | Apply the security baseline to Cloudflare zones |
 | `origin-cert install\|issue\|list\|revoke` | Cloudflare origin certificates, made on the host |
+| `credentials check\|install\|review\|status\|record\|report\|validate\|…` | The fleet's credential registry: observe the stores, install a value, review, record and report |
+| `iam plan\|apply\|verify [<app> <stack>]…` | Each stack's parameter-store IAM policy and operators' group |
 
 ## Quick Start
 
