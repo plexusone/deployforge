@@ -257,3 +257,18 @@ func TestDatabaseParameters(t *testing.T) {
 		t.Errorf("err = %v", err)
 	}
 }
+
+func TestCredentials(t *testing.T) {
+	f := load(t)
+	f.Credentials = &Credentials{Registry: "credentials/credentials.json", Targets: "credentials/targets.json"}
+	if err := f.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	f.Credentials = &Credentials{Events: "/abs/events.json"}
+	err := f.Validate()
+	for _, want := range []string{"needs a registry", "events must be relative"} {
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%v, want %q", err, want)
+		}
+	}
+}
