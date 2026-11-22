@@ -75,3 +75,15 @@ func TestRenderWithNothingToSetUp(t *testing.T) {
 		t.Errorf("%v\n%s", err, page)
 	}
 }
+
+func TestRenderCopiesCommands(t *testing.T) {
+	reg := credspec.NewRegistry(secret("one-cloud/prod/SESSION_KEY", nil))
+	page, err := Render(fleettest.Fleet(), "one-cloud", "prod", reg, credspec.NewLog(), Options{Tool: []string{"deployforge", "credentials"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(page)
+	if !strings.Contains(s, "navigator.clipboard") || strings.Index(s, "<script>") < strings.Index(s, "</main>") {
+		t.Error("the page has no copy script after its content")
+	}
+}
