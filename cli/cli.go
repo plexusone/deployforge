@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strings"
@@ -284,7 +285,7 @@ func deployCmd(load func() (*fleet.Fleet, error), fleetPath *string, o Options) 
 	var healthTimeout, keep int
 	root := &cobra.Command{
 		Use:   "deploy",
-		Short: "Deploy a release to an app stack, roll it back, or unlock it",
+		Short: "Deploy a release to an app stack, roll it back, unlock it, or show its status",
 		Long: `Deploy a release to one app stack, roll it back, or clear a stale deploy lock,
 from the operator's machine.
 
@@ -393,7 +394,82 @@ Environment:
 			return err
 		},
 	})
+	root.AddCommand(&cobra.Command{
+		Use:   "status <app> <stack>",
+		Short: "Show the stack's live release, the releases kept and its lock, against the ledger",
+		Long: "status reads the stack's host, changing nothing: the release current points at, the release\n" +
+			"directories kept, who holds the deploy lock, and whether it has deployforge's audit log. It compares\n" +
+			"the live release with the ledger's, so a stack another tool deployed can be checked before\n" +
+			"deployforge takes it over: they must agree, and a rollback needs a second release kept.",
+		Args: cobra.ExactArgs(2),
+		RunE: func(c *cobra.Command, args []string) error {
+			d, err := newDeployer(c)
+			if err != nil {
+				return err
+			}
+			st, err := d.Status(c.Context(), args[0], args[1])
+			if err != nil {
+				return err
+			}
+			entries, err := ledger.Read(ledger.Path(ledgerDir, d.Fleet, mustApp(d.Fleet, args[0]), args[1]))
+			if err != nil {
+				return err
+			}
+			return writeStatus(c.OutOrStdout(), args[0], args[1], st, entries)
+		},
+	})
 	return root
+}
+
+// mustApp is an app Status already resolved.
+func mustApp(f *fleet.Fleet, name string) fleet.App {
+	a, ok := f.App(name)
+	if !ok {
+		panic("cli: app " + name + " was resolved but is not in the fleet")
+	}
+	return a
+}
+
+// writeStatus prints a stack's host state and how it agrees with the
+// ledger, and returns an error when they disagree.
+func writeStatus(w io.Writer, app, stack string, st *onhost.Status, entries []ledger.Entry) error {
+	live := cmp.Or(st.Live, "none")
+	lines := []string{
+		fmt.Sprintf("%s/%s on the host", app, stack),
+		"  live      " + live,
+		fmt.Sprintf("  releases  %d kept: %s", len(st.Releases), strings.Join(st.Releases, ", ")),
+	}
+	if st.Lock != nil {
+		lines = append(lines, fmt.Sprintf("  lock      held by %s for %s since %s", st.Lock.Operator, st.Lock.Action, st.Lock.Since.Format(time.RFC3339)))
+	} else {
+		lines = append(lines, "  lock      free")
+	}
+	if st.Audited {
+		lines = append(lines, "  audit     kept by deployforge")
+	} else {
+		lines = append(lines, "  audit     none yet: deployforge has not deployed this stack")
+	}
+	var problem error
+	cur, ok := ledger.Current(entries)
+	switch {
+	case !ok && st.Live == "":
+		lines = append(lines, "  ledger    empty, and nothing is live")
+	case !ok:
+		lines = append(lines, "  ledger    empty")
+		problem = fmt.Errorf("status: %s/%s runs %s but its ledger is empty; import the ledger first", app, stack, live)
+	case cur.Release != st.Live:
+		lines = append(lines, "  ledger    says "+cur.Release)
+		problem = fmt.Errorf("status: the host runs %s but the ledger says %s", live, cur.Release)
+	default:
+		lines = append(lines, "  ledger    agrees")
+	}
+	if ok && len(st.Releases) < 2 {
+		lines = append(lines, "  note      only one release is kept, so there is nothing to roll back to yet")
+	}
+	if _, err := fmt.Fprintln(w, strings.Join(lines, "\n")); err != nil {
+		return err
+	}
+	return problem
 }
 
 func ledgerCmd(load func() (*fleet.Fleet, error)) *cobra.Command {
@@ -501,6 +577,35 @@ func ledgerCmd(load func() (*fleet.Fleet, error)) *cobra.Command {
 			return err
 		},
 	})
+
+	var from, appField string
+	imp := &cobra.Command{
+		Use:   "import <app> <stack> --from <file>",
+		Short: "Bring in a stack's ledger written by another tool, checking every entry",
+		Long: "import reads a JSON Lines ledger of the same entries, such as one another deploy tool kept,\n" +
+			"renames --app-field to app when the app is named differently, and writes it as the stack's ledger\n" +
+			"in --dir. Every entry is checked as ledger record checks it, in order, and nothing is written\n" +
+			"unless all pass. The stack's ledger must be empty, or be the file imported, which is replaced.",
+		Args: cobra.ExactArgs(2),
+		RunE: func(c *cobra.Command, args []string) error {
+			f, err := load()
+			if err != nil {
+				return err
+			}
+			n, err := ledger.Import(f, dir, args[0], args[1], from, appField)
+			if err != nil {
+				return err
+			}
+			_, err = fmt.Fprintf(c.OutOrStdout(), "imported %d entries for %s/%s\n", n, args[0], args[1])
+			return err
+		},
+	}
+	imp.Flags().StringVar(&from, "from", "", "the ledger to import")
+	imp.Flags().StringVar(&appField, "app-field", "app", "the field naming the app in the imported ledger, such as site")
+	if err := imp.MarkFlagRequired("from"); err != nil {
+		panic(err) // the flag is defined just above
+	}
+	root.AddCommand(imp)
 	return root
 }
 
