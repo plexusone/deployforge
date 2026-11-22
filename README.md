@@ -57,6 +57,7 @@ Your repository keeps the configuration; deployforge is the binary.
 | `release package <app>` | Package a clean, tagged checkout |
 | `deploy ship\|release\|rollback\|unlock <app> <stack>` | Deploy, roll back, or clear a stale lock |
 | `deploy status <app> <stack>` | The live release, releases kept and lock on the host, against the ledger |
+| `deploy unpushed [--fetch]` | Commits live releases were built from that are on no remote branch |
 | `ledger record\|show\|current` | Record and read the deploy ledger |
 | `ledger import <app> <stack> --from <file>` | Bring in another tool's ledger, checking every entry |
 | `db roles plan\|apply\|verify <app> <stack>` | Provision a stack's databases and roles |

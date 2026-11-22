@@ -48,6 +48,7 @@ deployforge deploy ship app prod
 | `deploy/deployer` | The operator side: build the request, dial the stack's host, transfer, run on the host, record |
 | `deploy/onhost` | The host side: lock, unpack, install, validate, migrate, switch, health, restore, prune, audit |
 | `deploy/ship` | Package a tag or local commit in a temporary worktree with the app's release script |
+| `deploy/unpushed` | The commits each live release was built from that are on no remote branch of their checkout |
 | `deploy/readiness` | Check every host name's /readyz from outside |
 | `deploy/hooks` | Run the operator's hooks around packaging, deploy and rollback |
 | `deploy/hostaddr` | Resolve a host's or server's address, and Pulumi configuration values |
