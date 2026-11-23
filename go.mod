@@ -42,7 +42,7 @@ require (
 	github.com/spf13/pflag v1.1.0 // indirect
 	github.com/tidwall/gjson v1.20.6 // indirect
 	github.com/tidwall/match v1.2.0 // indirect
-	github.com/tidwall/pretty v1.3.0 // indirect
+	github.com/tidwall/pretty v1.3.1 // indirect
 	github.com/tidwall/sjson v1.2.11 // indirect
 	github.com/yuin/goldmark v1.8.7 // indirect
 	golang.org/x/crypto v0.59.0 // indirect
