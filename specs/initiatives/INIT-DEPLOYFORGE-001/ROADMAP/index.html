@@ -909,6 +909,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#phase-8-proving-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 8: Proving it
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1139,6 +1150,17 @@
     <span class="md-ellipsis">
       
         Phase 7: The fleet document as the source
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-8-proving-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 8: Proving it
       
     </span>
   </a>
@@ -1394,6 +1416,44 @@
 <td>RMI-DEPLOYFORGE-028</td>
 <td>Every field a converted fleet needs, so the fleet document can be the file a fleet commits: app <code>labels</code> for facts deployforge keeps but never acts on</td>
 <td>done</td>
+</tr>
+</tbody>
+</table>
+<h2 id="phase-8-proving-it">Phase 8: Proving it<a class="headerlink" href="#phase-8-proving-it" title="Permanent link">&para;</a></h2>
+<p>Deploy real stacks and record how it goes, before adding features.</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Item</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RMI-DEPLOYFORGE-030</td>
+<td>Acceptance tests on a throwaway host like production: a normal deploy, an unhealthy release, a deploy killed partway, and a migration the previous release cannot run against</td>
+<td>planned</td>
+</tr>
+<tr>
+<td>RMI-DEPLOYFORGE-031</td>
+<td><code>--format json</code> reports from <code>ship</code>, <code>release</code>, <code>rollback</code> and <code>status</code>: the outcome, the phase and step that failed, what was kept or restored, and whether the migration completed</td>
+<td>done</td>
+</tr>
+<tr>
+<td>RMI-DEPLOYFORGE-032</td>
+<td>Operator documentation: the expand-then-contract migration rule, local builds and JSON reports in the Quick Start</td>
+<td>done</td>
+</tr>
+<tr>
+<td>RMI-DEPLOYFORGE-033</td>
+<td>The first stack deployed by deployforge in production</td>
+<td>planned</td>
+</tr>
+<tr>
+<td>RMI-DEPLOYFORGE-034</td>
+<td>A month of real use recorded: every deploy, failure and rollback in the ledger, with a note on each failure</td>
+<td>planned</td>
 </tr>
 </tbody>
 </table>

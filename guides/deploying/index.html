@@ -603,6 +603,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#migrations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migrations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reports
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-ledger" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1301,6 +1323,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#migrations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migrations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reports" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reports
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-ledger" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1354,7 +1398,7 @@
 
 
 <h1 id="deploying">Deploying<a class="headerlink" href="#deploying" title="Permanent link">&para;</a></h1>
-<p>This guide covers deploying a release to a stack, rolling it back, clearing a stale lock, reading status, what runs on the host, the deploy ledger, hooks, and packaging a release archive. For a first deploy, see <a href="../getting-started/">Getting started</a>. To move a stack from another tool, see <a href="../taking-over/">Taking over a stack</a>. For the fields these commands read, see <a href="../fleet-document/">Fleet document</a>.</p>
+<p>This guide covers deploying a release to a stack, rolling it back, clearing a stale lock, reading status, what runs on the host, migrations a rollback can survive, reports for scripts and agents, the deploy ledger, hooks, and packaging a release archive. For a first deploy, see <a href="../getting-started/">Getting started</a>. To move a stack from another tool, see <a href="../taking-over/">Taking over a stack</a>. For the fields these commands read, see <a href="../fleet-document/">Fleet document</a>.</p>
 <h2 id="how-a-deploy-runs">How a deploy runs<a class="headerlink" href="#how-a-deploy-runs" title="Permanent link">&para;</a></h2>
 <p>The operator's machine does the work that needs credentials: it reads the fleet document and the parameter store, and builds the release. It copies a linux/amd64 build of deployforge and the archive to the host, then runs deployforge there as root over SSH. There is no agent on the host.</p>
 <p>Hosts are reached as <code>&lt;sshUser&gt;@&lt;address&gt;</code> with your system's <code>ssh</code> and <code>scp</code>, so your SSH configuration, agent and known hosts apply.</p>
@@ -1401,6 +1445,10 @@
 <tr>
 <td><code>--hooks</code></td>
 <td>Directory of hook scripts. Default <code>.deployforge/hooks</code>.</td>
+</tr>
+<tr>
+<td><code>--format</code></td>
+<td><code>text</code>, or <code>json</code> for one JSON report on standard output from <code>ship</code>, <code>release</code>, <code>rollback</code> and <code>status</code>. See <a href="#reports">Reports</a>. Default <code>text</code>.</td>
 </tr>
 </tbody>
 </table>
@@ -1480,15 +1528,63 @@
 <li>Migrate: run the new binary's <code>migrate</code> as the stack's user, with the migrate-only variables in a temporary environment file removed afterwards.</li>
 <li>Switch: point <code>/opt/&lt;unit&gt;/current</code> at the new release and restart the unit.</li>
 <li>Readiness: wait for <code>/readyz</code> on the loopback port, once for each host name in the <code>Host</code> header, until <code>--health-timeout</code>.</li>
-<li>Restore: if any step fails, put back the previous release and files, restart, and check readiness again. The error names the step that failed. Completed migrations stay applied.</li>
+<li>Restore: if any step fails, put back the previous release and files, restart, and check readiness again. The error names the step that failed. Completed migrations stay applied; see <a href="#migrations">Migrations</a>.</li>
 <li>Prune: keep the newest <code>--keep</code> releases, and always the live one and the one it replaced; remove the rest.</li>
 <li>Audit: write one JSON line for the action in the app's directory on the host, then unlock.</li>
 </ol>
 <p>When the fleet document turns on <code>selfcheck</code>, the app's <code>selfcheck</code> subcommand runs before and after the switch, as <code>--selfcheck</code> says.</p>
+<h2 id="migrations">Migrations<a class="headerlink" href="#migrations" title="Permanent link">&para;</a></h2>
+<p>A rollback, and the restore after a failed deploy, switch the code back. They never reverse a migration. The previous release then runs against the schema the new release migrated, so every migration must work with the release before it. Make each schema change in two releases, expand then contract:</p>
+<ol>
+<li><strong>Expand.</strong> Add what the new code needs: a new table, or a column that is nullable or has a default. The old code ignores it. Write to both the old and new shapes where the code moves data across.</li>
+<li><strong>Contract.</strong> Once no release you could roll back to uses the old shape, remove it in a later release.</li>
+</ol>
+<p>A change that the previous release cannot run against is not safe to deploy unattended. That includes dropping or renaming a column or table it reads, adding a <code>NOT NULL</code> column without a default, or narrowing a type. Split it as above. If you can't, deploy it by hand, after <code>ship</code> has taken its snapshot, and plan to restore the snapshot instead of rolling back.</p>
+<p>A failed deploy says whether its migration completed: the error, and <code>failure.migrated</code> in a <a href="#reports">report</a>. When it did, the previous release is running on the migrated schema.</p>
+<h2 id="reports">Reports<a class="headerlink" href="#reports" title="Permanent link">&para;</a></h2>
+<p>With <code>--format json</code>, <code>ship</code>, <code>release</code>, <code>rollback</code> and <code>status</code> write one JSON document to standard output and send their progress to standard error. An agent or a script reads the report instead of the prose. The exit status still says whether the command failed.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span><span class="nt">&quot;command&quot;</span><span class="p">:</span><span class="s2">&quot;ship&quot;</span><span class="p">,</span><span class="nt">&quot;app&quot;</span><span class="p">:</span><span class="s2">&quot;example-app&quot;</span><span class="p">,</span><span class="nt">&quot;stack&quot;</span><span class="p">:</span><span class="s2">&quot;prod&quot;</span><span class="p">,</span><span class="nt">&quot;ok&quot;</span><span class="p">:</span><span class="kc">false</span><span class="p">,</span><span class="nt">&quot;phase&quot;</span><span class="p">:</span><span class="s2">&quot;deploy&quot;</span><span class="p">,</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w"> </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="s2">&quot;…&quot;</span><span class="p">,</span><span class="nt">&quot;failure&quot;</span><span class="p">:{</span><span class="nt">&quot;step&quot;</span><span class="p">:</span><span class="s2">&quot;health&quot;</span><span class="p">,</span><span class="nt">&quot;kept&quot;</span><span class="p">:</span><span class="kc">false</span><span class="p">,</span><span class="nt">&quot;restored&quot;</span><span class="p">:</span><span class="kc">true</span><span class="p">,</span><span class="nt">&quot;migrated&quot;</span><span class="p">:</span><span class="kc">true</span><span class="p">,</span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="s2">&quot;…&quot;</span><span class="p">},</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w"> </span><span class="nt">&quot;snapshot&quot;</span><span class="p">:</span><span class="s2">&quot;example-app-prod-…&quot;</span><span class="p">}</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ok</code></td>
+<td>The command did all it set out to.</td>
+</tr>
+<tr>
+<td><code>phase</code></td>
+<td>Where it failed: <code>preflight</code> (checks before packaging), <code>package</code>, <code>snapshot</code>, <code>deploy</code>, <code>public-check</code>, or <code>status</code>.</td>
+</tr>
+<tr>
+<td><code>failure</code></td>
+<td>How the host's part failed, when it got that far. <code>step</code> is <code>unpack</code>, <code>install</code>, <code>validate</code>, <code>selfcheck-pre</code>, <code>migrate</code>, <code>switch</code>, <code>health</code> or <code>selfcheck-post</code>. <code>kept</code> means the running release was never switched away from. <code>restored</code> means the previous release and its files run again. <code>stopped</code> means a first release failed, so nothing runs. <code>migrated</code> means the release's migration completed and stays applied.</td>
+</tr>
+<tr>
+<td><code>entry</code></td>
+<td>The ledger entry recorded. A ship that failed its <code>public-check</code> has one: the release is live and recorded.</td>
+</tr>
+<tr>
+<td><code>snapshot</code></td>
+<td>The database snapshot <code>ship</code> took first.</td>
+</tr>
+<tr>
+<td><code>status</code>, <code>ledger</code></td>
+<td>For <code>status</code>: what the host reports, and the ledger's current release.</td>
+</tr>
+</tbody>
+</table>
 <h2 id="the-ledger">The ledger<a class="headerlink" href="#the-ledger" title="Permanent link">&para;</a></h2>
 <p>The ledger is a JSON Lines file for each stack in <code>--dir</code> (default <code>deployments</code>), kept in your repository. A successful deploy or rollback appends an entry. It never holds a secret value. Commit the file after each deploy.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>deployforge<span class="w"> </span>ledger<span class="w"> </span>show<span class="w"> </span>example-app<span class="w"> </span>prod<span class="w"> </span>-n<span class="w"> </span><span class="m">5</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>deployforge<span class="w"> </span>ledger<span class="w"> </span>current<span class="w"> </span>example-app<span class="w"> </span>prod
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>deployforge<span class="w"> </span>ledger<span class="w"> </span>show<span class="w"> </span>example-app<span class="w"> </span>prod<span class="w"> </span>-n<span class="w"> </span><span class="m">5</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>deployforge<span class="w"> </span>ledger<span class="w"> </span>current<span class="w"> </span>example-app<span class="w"> </span>prod
 </code></pre></div>
 <ul>
 <li><code>ledger show &lt;app&gt; &lt;stack&gt;</code> prints the most recent entries. <code>-n</code> sets how many; <code>0</code> prints all; the default is 10.</li>
@@ -1558,8 +1654,8 @@
 <p>The host steps run inside one request, so they have no hooks of their own.</p>
 <h2 id="release-package">Release package<a class="headerlink" href="#release-package" title="Permanent link">&para;</a></h2>
 <p><code>release package</code> writes a reproducible archive and its <code>.sha256</code> file. Your app's release script normally calls it:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>deployforge<span class="w"> </span>release<span class="w"> </span>package<span class="w"> </span>example-app<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span>--repo<span class="w"> </span>.<span class="w"> </span>--from<span class="w"> </span>build/<span class="w"> </span>--out<span class="w"> </span>dist
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>deployforge<span class="w"> </span>release<span class="w"> </span>package<span class="w"> </span>example-app<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span>--repo<span class="w"> </span>.<span class="w"> </span>--from<span class="w"> </span>build/<span class="w"> </span>--out<span class="w"> </span>dist
 </code></pre></div>
 <p>It checks that:</p>
 <ul>
