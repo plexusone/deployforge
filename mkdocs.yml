@@ -1,0 +1,73 @@
+site_name: deployforge
+site_description: Ship Go apps to your own servers - release archives, systemd and Caddy, a deploy ledger, the edge, databases and credentials
+site_url: https://plexusone.github.io/deployforge/
+repo_url: https://github.com/plexusone/deployforge
+repo_name: plexusone/deployforge
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+  palette:
+    # Dark mode first (PlexusOne default)
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - content.code.copy
+
+extra_css:
+  - https://plexusone.dev/css/plexusone-mkdocs.css
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - tables
+  - toc:
+      permalink: true
+
+# docs/guides/ holds the user guides, docs/releases/ the release notes and
+# docs/specs/ the design documents.
+nav:
+  - Home: index.md
+  - Guides:
+      - Getting Started: guides/getting-started.md
+      - The Fleet Document: guides/fleet-document.md
+      - Deploying: guides/deploying.md
+      - Hosts: guides/hosts.md
+      - The Edge: guides/edge.md
+      - Databases: guides/databases.md
+      - Credentials: guides/credentials.md
+      - Taking Over a Stack: guides/taking-over.md
+      - Embedding deployforge: guides/embedding.md
+  - API Reference: https://pkg.go.dev/github.com/plexusone/deployforge
+  - Design:
+      - Product Requirements: specs/initiatives/INIT-DEPLOYFORGE-001/PRD.md
+      - Technical Requirements: specs/initiatives/INIT-DEPLOYFORGE-001/TRD.md
+      - Plan: specs/initiatives/INIT-DEPLOYFORGE-001/PLAN.md
+      - Roadmap: specs/initiatives/INIT-DEPLOYFORGE-001/ROADMAP.md
+  - Releases:
+      - Changelog: releases/changelog.md
+      - v0.1.0: releases/v0.1.0.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/plexusone/deployforge

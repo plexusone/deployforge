@@ -11,9 +11,10 @@ the previous release on any failure, recording every release in a ledger.
 
 Your repository keeps the configuration; deployforge is the binary.
 
-> **Status:** in development, not yet released. Deploying, the host, the
-> edge and databases work; static sites on Cloudflare Workers are next.
-> The design is in [docs/specs](docs/specs/initiatives/INIT-DEPLOYFORGE-001/PRD.md).
+> **Status:** v0.1.0. Deploying, the host, the edge, databases and
+> credentials work; static sites on Cloudflare Workers are next. The
+> [guides](docs/guides/getting-started.md) cover every command, and the
+> design is in [docs/specs](docs/specs/initiatives/INIT-DEPLOYFORGE-001/PRD.md).
 
 ## Features
 
@@ -117,6 +118,17 @@ deployforge deploy ship example-app prod --tag v1.2.3
 
 The other tool takes no deploy lock, so once a stack has moved, deploy it
 only with deployforge.
+
+## Documentation
+
+- [Guides](docs/guides/getting-started.md): getting started, the fleet
+  document, deploying, hosts, the edge, databases, credentials, taking
+  over a stack, and embedding deployforge
+- [Release notes](docs/releases/v0.1.0.md) and the [changelog](CHANGELOG.md)
+- [Design](docs/specs/initiatives/INIT-DEPLOYFORGE-001/PRD.md)
+- [API reference](https://pkg.go.dev/github.com/plexusone/deployforge)
+
+The site is built with MkDocs: `mkdocs serve` from the repository root.
 
 ## License
 
