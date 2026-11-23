@@ -1,0 +1,4 @@
+# Text files keep LF line endings on every platform, so templates embedded in
+# the binary and committed generated files are the same wherever they are
+# checked out.
+* text=auto eol=lf
