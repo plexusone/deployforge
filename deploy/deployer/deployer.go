@@ -385,7 +385,13 @@ func (d *Deployer) run(ctx context.Context, t target.Target, req onhost.Request,
 	var out bytes.Buffer
 	err = tr.Sudo(ctx, []string{bin, "on-host", "--work", work}, bytes.NewReader(body), &out, d.Log)
 	if err != nil {
-		return onhost.Result{}, fmt.Errorf("deployer: the %s on the host failed: %w", req.Action, err)
+		err = fmt.Errorf("deployer: the %s on the host failed: %w", req.Action, err)
+		// A host that got as far as a step says how it failed.
+		var res onhost.Result
+		if json.Unmarshal(bytes.TrimSpace(out.Bytes()), &res) == nil && res.Failure != nil {
+			return onhost.Result{}, &onhost.StepError{Failure: *res.Failure, Err: err}
+		}
+		return onhost.Result{}, err
 	}
 	var res onhost.Result
 	dec := json.NewDecoder(&out)

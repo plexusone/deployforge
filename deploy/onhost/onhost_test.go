@@ -279,6 +279,10 @@ func TestAFailedValidateKeepsTheRunningReleaseAndItsFiles(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), step+" failed") {
 			t.Fatalf("%s: err = %v", step, err)
 		}
+		// Nothing switched, and a failed migrate is not a completed one.
+		if f, ok := FailureOf(err); !ok || f.Step != step || !f.Kept || f.Migrated || f.Restored {
+			t.Errorf("%s: failure %+v, %v", step, f, ok)
+		}
 		if r.sys.live() != idA {
 			t.Errorf("%s: current = %q", step, r.sys.live())
 		}
@@ -307,6 +311,10 @@ func TestAnUnhealthyReleaseIsRolledBackWithItsFiles(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "failed its health check") {
 		t.Fatalf("err = %v", err)
 	}
+	// The previous release runs again, on a schema the new release migrated.
+	if f, ok := FailureOf(err); !ok || f.Step != StepHealth || f.Kept || !f.Restored || !f.Migrated {
+		t.Errorf("failure %+v, %v; want health, restored, migrated", f, ok)
+	}
 	if r.sys.live() != idA {
 		t.Errorf("current = %q", r.sys.live())
 	}
@@ -325,8 +333,12 @@ func TestAnUnhealthyReleaseIsRolledBackWithItsFiles(t *testing.T) {
 func TestAnUnhealthyFirstReleaseStopsTheService(t *testing.T) {
 	r := newRig(t)
 	r.sys.unhealthy[idA] = true
-	if _, err := r.release(idA); err == nil {
+	_, err := r.release(idA)
+	if err == nil {
 		t.Fatal("an unhealthy first release succeeded")
+	}
+	if f, ok := FailureOf(err); !ok || f.Step != StepHealth || !f.Stopped || f.Restored {
+		t.Errorf("failure %+v, %v; want health, stopped", f, ok)
 	}
 	if _, err := os.Lstat(filepath.Join(r.root, "opt", "one-cloud", "current")); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("current stayed: %v", err)

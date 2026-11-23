@@ -149,7 +149,14 @@ func (tr *transport) Sudo(ctx context.Context, argv []string, stdin io.Reader, s
 	h := &onhost.Host{Root: tr.sys.root, Sys: tr.sys, Log: stderr, Sleep: func(time.Duration) {}}
 	res, err := h.Run(ctx, req, argv[3])
 	if err != nil {
-		_, _ = fmt.Fprintln(stderr, err) // as deployforge on-host reports it
+		// As deployforge on-host reports it: how it failed on standard
+		// output, the error on standard error.
+		if f, ok := onhost.FailureOf(err); ok {
+			if encErr := json.NewEncoder(stdout).Encode(onhost.Result{Failure: &f}); encErr != nil {
+				return encErr
+			}
+		}
+		_, _ = fmt.Fprintln(stderr, err)
 		return errors.New("exit status 1")
 	}
 	return json.NewEncoder(stdout).Encode(res)
@@ -349,11 +356,17 @@ func TestNothingIsSentUntilEveryLocalCheckPasses(t *testing.T) {
 func TestAFailedDeployIsNotRecorded(t *testing.T) {
 	r := newRig(t)
 	r.tr.sys.fail = true
-	if _, err := r.d.Release(context.Background(), r.opts()); err == nil {
+	_, err := r.d.Release(context.Background(), r.opts())
+	if err == nil {
 		t.Fatal("a deploy whose validate failed succeeded")
 	}
 	if len(r.ledger()) != 0 {
 		t.Error("a failed deploy was recorded")
+	}
+	// The host says how it failed: at validate, before anything switched,
+	// with nothing migrated.
+	if f, ok := onhost.FailureOf(err); !ok || f.Step != onhost.StepValidate || !f.Kept || f.Migrated || f.Restored {
+		t.Errorf("failure %+v, %v; want validate, kept, not migrated", f, ok)
 	}
 	if !strings.Contains(r.log.String(), "validate failed") {
 		t.Errorf("the host's error was not shown:\n%s", r.log.String())

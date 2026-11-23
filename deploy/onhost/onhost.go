@@ -96,6 +96,9 @@ type Result struct {
 	Selfcheck *SelfcheckResult `json:"selfcheck,omitempty"`
 	// Status is what a status request found.
 	Status *Status `json:"status,omitempty"`
+	// Failure is how a failed release or rollback failed; the request
+	// fails too.
+	Failure *Failure `json:"failure,omitempty"`
 }
 
 var (
@@ -283,12 +286,12 @@ func (h *Host) release(ctx context.Context, r Request, work string) (Result, err
 	}
 	if err := archive.Extract(filepath.Join(work, "release.tgz"), rel); err != nil {
 		_ = os.RemoveAll(rel) // a partial release must not stay; the extract error is the one to report
-		return Result{}, err
+		return Result{}, failed(StepUnpack, Failure{Kept: true}, err)
 	}
 	bin := filepath.Join(rel, t.App)
 	if st, err := os.Stat(bin); err != nil || !st.Mode().IsRegular() || st.Mode()&0o100 == 0 {
 		_ = os.RemoveAll(rel) // the missing binary is the error to report
-		return Result{}, fmt.Errorf("onhost: %s is not an executable file", bin)
+		return Result{}, failed(StepUnpack, Failure{Kept: true}, fmt.Errorf("onhost: %s is not an executable file", bin))
 	}
 
 	newNames := make([]string, 0, len(r.Secrets.Files))
@@ -298,14 +301,17 @@ func (h *Host) release(ctx context.Context, r Request, work string) (Result, err
 	oldNames, err := readManaged(l.managed)
 	if err != nil {
 		_ = os.RemoveAll(rel) // nothing else has changed yet
-		return Result{}, err
+		return Result{}, failed(StepInstall, Failure{Kept: true}, err)
 	}
 	etc := &etcFiles{h: h, dir: l.etc, group: t.User, old: oldNames, names: union([]string{"config.yaml", "env", ".managed"}, newNames, oldNames)}
 	if err := etc.save(); err != nil {
 		_ = os.RemoveAll(rel) // nothing was installed
-		return Result{}, err
+		return Result{}, failed(StepInstall, Failure{Kept: true}, err)
 	}
-	abort := func(cause error) (Result, error) {
+	// abort undoes a release that never switched: the running release and
+	// its files stay; a migration that completed stays applied.
+	migrated := false
+	abort := func(step string, cause error) (Result, error) {
 		h.logf("%v; keeping the running release", cause)
 		if err := etc.restore(); err != nil {
 			cause = errors.Join(cause, err)
@@ -313,18 +319,18 @@ func (h *Host) release(ctx context.Context, r Request, work string) (Result, err
 		if err := os.RemoveAll(rel); err != nil {
 			cause = errors.Join(cause, err)
 		}
-		return Result{}, cause
+		return Result{}, failed(step, Failure{Kept: true, Migrated: migrated}, cause)
 	}
 
 	if err := etc.install(r.Config, secrets.EnvFile(r.Secrets.Env), r.Secrets.Files); err != nil {
-		return abort(err)
+		return abort(StepInstall, err)
 	}
 
 	cfg := h.path("etc", t.Unit, "config.yaml")
 	envFile := h.path("etc", t.Unit, "env")
 	h.logf("validating %s", r.ReleaseID)
 	if err := h.Sys.RunAs(ctx, t.User, []string{envFile}, []string{bin, "validate", "-c", cfg}, h.Log, h.Log); err != nil {
-		return abort(fmt.Errorf("validate failed: %w", err))
+		return abort(StepValidate, fmt.Errorf("validate failed: %w", err))
 	}
 	var check *SelfcheckResult
 	if sc := r.Selfcheck; sc != nil {
@@ -333,13 +339,13 @@ func (h *Host) release(ctx context.Context, r Request, work string) (Result, err
 		check.Pre, failed = h.selfcheck(ctx, r, bin, cfg, envFile, "pre")
 		check.Failed = append(check.Failed, failed...)
 		if check.Pre != stagePass && sc.Mode == SelfcheckEnforce {
-			return abort(fmt.Errorf("the self-check's pre stage failed: %s", strings.Join(failed, ", ")))
+			return abort(StepSelfcheckPre, fmt.Errorf("the self-check's pre stage failed: %s", strings.Join(failed, ", ")))
 		}
 	}
 	// Admin DSNs and role passwords exist on the host only for this step.
 	migrateEnv := filepath.Join(work, "migrate.env")
 	if err := os.WriteFile(migrateEnv, secrets.EnvFile(r.Secrets.Migrate), 0o600); err != nil {
-		return abort(err)
+		return abort(StepMigrate, err)
 	}
 	h.logf("migrating databases with %s", r.ReleaseID)
 	err = h.Sys.RunAs(ctx, t.User, []string{envFile, migrateEnv}, []string{bin, "migrate", "-c", cfg}, h.Log, h.Log)
@@ -347,15 +353,16 @@ func (h *Host) release(ctx context.Context, r Request, work string) (Result, err
 		err = errors.Join(err, rmErr)
 	}
 	if err != nil {
-		return abort(fmt.Errorf("migrate failed (completed steps stay applied): %w", err))
+		return abort(StepMigrate, fmt.Errorf("migrate failed (completed steps stay applied): %w", err))
 	}
+	migrated = true
 
 	prev, err := liveRelease(l.current)
 	if err != nil {
-		return abort(err)
+		return abort(StepSwitch, err)
 	}
 	if err := switchTo(l.current, rel); err != nil {
-		return abort(err)
+		return abort(StepSwitch, err)
 	}
 	unit := t.Unit + ".service"
 	if err := h.Sys.DaemonReload(ctx); err != nil {
@@ -363,6 +370,7 @@ func (h *Host) release(ctx context.Context, r Request, work string) (Result, err
 	}
 	restartErr := h.Sys.Restart(ctx, unit)
 	var failure error
+	failedStep := StepHealth
 	if restartErr != nil || !h.healthy(ctx, r) {
 		h.logf("%s failed its health check; rolling back", r.ReleaseID)
 		h.logf("journal:\n%s", h.Sys.Journal(ctx, unit, 60))
@@ -375,23 +383,28 @@ func (h *Host) release(ctx context.Context, r Request, work string) (Result, err
 		check.Post, failed = h.selfcheck(ctx, r, bin, cfg, envFile, "post")
 		check.Failed = append(check.Failed, failed...)
 		if check.Post != stagePass && check.Mode == SelfcheckEnforce {
+			failedStep = StepSelfcheckPost
 			h.logf("%s failed the self-check's post stage; rolling back", r.ReleaseID)
 			failure = fmt.Errorf("onhost: %s failed the self-check's post stage: %s", r.ReleaseID, strings.Join(failed, ", "))
 		}
 	}
 	if failure != nil {
+		f := Failure{Migrated: true}
+		restored := true
 		if err := etc.restore(); err != nil {
-			failure = errors.Join(failure, err)
+			failure, restored = errors.Join(failure, err), false
 		}
 		if prev != "" {
 			if err := switchTo(l.current, prev); err != nil {
-				return Result{}, errors.Join(failure, err)
+				return Result{}, failed(failedStep, f, errors.Join(failure, err))
 			}
 			if err := h.Sys.Restart(ctx, unit); err != nil {
-				failure = errors.Join(failure, err)
+				failure, restored = errors.Join(failure, err), false
 			}
 			h.logf("restored %s", filepath.Base(prev))
+			f.Restored = restored
 		} else {
+			f.Stopped = true
 			if err := os.Remove(l.current); err != nil {
 				failure = errors.Join(failure, err)
 			}
@@ -399,7 +412,7 @@ func (h *Host) release(ctx context.Context, r Request, work string) (Result, err
 				failure = errors.Join(failure, err)
 			}
 		}
-		return Result{}, failure
+		return Result{}, failed(failedStep, f, failure)
 	}
 	if err := etc.drop(); err != nil {
 		h.logf("removing the saved files: %v", err)
@@ -439,7 +452,7 @@ func (h *Host) rollback(ctx context.Context, r Request) (Result, error) {
 	}
 	h.logf("rolling back %s -> %s", filepath.Base(cur), prev)
 	if err := switchTo(l.current, filepath.Join(l.releases, prev)); err != nil {
-		return Result{}, err
+		return Result{}, failed(StepSwitch, Failure{Kept: true}, err)
 	}
 	unit := r.Target.Unit + ".service"
 	restartErr := h.Sys.Restart(ctx, unit)
@@ -454,12 +467,13 @@ func (h *Host) rollback(ctx context.Context, r Request) (Result, error) {
 		failure = errors.Join(failure, restartErr)
 	}
 	if err := switchTo(l.current, cur); err != nil {
-		return Result{}, errors.Join(failure, err)
+		return Result{}, failed(StepHealth, Failure{}, errors.Join(failure, err))
 	}
+	f := Failure{Restored: true}
 	if err := h.Sys.Restart(ctx, unit); err != nil {
-		failure = errors.Join(failure, err)
+		failure, f.Restored = errors.Join(failure, err), false
 	}
-	return Result{}, failure
+	return Result{}, failed(StepHealth, f, failure)
 }
 
 // healthy probes /readyz once a second, once per host name, until every host
