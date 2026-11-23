@@ -12,6 +12,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	oscfs "github.com/grokify/oscompat/fs"
 	"io"
 	"io/fs"
 	"os"
@@ -87,7 +88,7 @@ func (r *Runner) Run(ctx context.Context, hook string, f Facts) error {
 	if err != nil {
 		return fmt.Errorf("hooks: %s: %w", hook, err)
 	}
-	if !st.Mode().IsRegular() || st.Mode().Perm()&0o111 == 0 {
+	if !st.Mode().IsRegular() || !oscfs.IsExecutableInfo(st, path) {
 		return fmt.Errorf("hooks: %s is not an executable file; make it executable or remove it", path)
 	}
 	out := r.Out

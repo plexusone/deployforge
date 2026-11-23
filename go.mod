@@ -10,6 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.84.0
 	github.com/aws/aws-sdk-go-v2/service/sts v1.53.0
 	github.com/cloudflare/cloudflare-go/v7 v7.15.0
+	github.com/grokify/oscompat v0.14.0
 	github.com/grokify/pgutil v0.2.0
 	github.com/invopop/jsonschema v0.14.0
 	github.com/plexusone/credforge v0.10.0
@@ -35,7 +36,6 @@ require (
 	github.com/aws/smithy-go v1.28.9 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.6.1 // indirect
-	github.com/grokify/oscompat v0.13.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/pb33f/go-yaml v0.2.0 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.2 // indirect

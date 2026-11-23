@@ -11,9 +11,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	oscfs "github.com/grokify/oscompat/fs"
 	"maps"
 	"os"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -452,7 +452,7 @@ func (f *Fleet) Validate() error {
 			bad("credentials", "needs a registry")
 		}
 		for _, p := range []struct{ name, path string }{{"registry", c.Registry}, {"events", c.Events}, {"reviews", c.Reviews}, {"targets", c.Targets}} {
-			if filepath.IsAbs(p.path) {
+			if oscfs.IsAbsAny(p.path) {
 				bad("credentials", "%s must be relative to the fleet document", p.name)
 			}
 		}
