@@ -132,7 +132,7 @@ func Package(f *fleet.Fleet, o Options) (Result, error) {
 	for _, in := range inputs {
 		revision += "input " + in.Repo + " " + in.Commit + "\n"
 	}
-	archive, err := pack(files, o.From, []byte(revision), time.Unix(secs, 0).UTC())
+	archive, err := pack(files, o.From, app.Name, []byte(revision), time.Unix(secs, 0).UTC())
 	if err != nil {
 		return Result{}, err
 	}
@@ -357,7 +357,7 @@ func CheckLinuxBinary(path string) error {
 // pack writes a reproducible gzipped tar: sorted entries, no owners, one
 // modification time (the commit's), and normalized modes. The same files from the
 // same commit give the same bytes with the same Go toolchain.
-func pack(files []string, dir string, revision []byte, mtime time.Time) ([]byte, error) {
+func pack(files []string, dir, binary string, revision []byte, mtime time.Time) ([]byte, error) {
 	var buf bytes.Buffer
 	gz, err := gzip.NewWriterLevel(&buf, gzip.BestCompression)
 	if err != nil {
@@ -413,8 +413,10 @@ func pack(files []string, dir string, revision []byte, mtime time.Time) ([]byte,
 		if err != nil {
 			return nil, err
 		}
+		// The app's binary is executable whatever the build machine kept,
+		// as on Windows, which keeps no execute bits.
 		mode := int64(0o644)
-		if st.Mode()&0o111 != 0 {
+		if name == binary || st.Mode()&0o111 != 0 {
 			mode = 0o755
 		}
 		if err := add(name, mode, data); err != nil {
