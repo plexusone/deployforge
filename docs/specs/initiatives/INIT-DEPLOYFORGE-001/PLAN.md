@@ -55,6 +55,6 @@ Phases 2 to 4 repeat the pattern for their packages.
 | Risk | Mitigation |
 |---|---|
 | Generalizing breaks behavior a fleet relies on | Packages move with their tests; a fleet already deployed by the engine is moved last, after a sample app runs end to end |
-| Rollback after an incompatible migration | Documented expand-then-contract rule; the ledger records each release's schema version |
+| Rollback after an incompatible migration | Documented expand-then-contract rule; a snapshot before a primary stack's deploy; a failed deploy reports whether its migration completed |
 | Root on the host | The on-host command accepts only a typed request, validates every path under the app's directories, and runs nothing from the release before `validate` as the app's user |
 | Provider lock-in | Interfaces per provider, with fakes in tests |

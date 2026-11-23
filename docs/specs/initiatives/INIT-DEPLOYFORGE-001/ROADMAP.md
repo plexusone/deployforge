@@ -67,3 +67,15 @@ Phases group the work; each phase's status follows from its items.
 | ID | Item | Status |
 |---|---|---|
 | RMI-DEPLOYFORGE-028 | Every field a converted fleet needs, so the fleet document can be the file a fleet commits: app `labels` for facts deployforge keeps but never acts on | done |
+
+## Phase 8: Proving it
+
+Deploy real stacks and record how it goes, before adding features.
+
+| ID | Item | Status |
+|---|---|---|
+| RMI-DEPLOYFORGE-030 | Acceptance tests on a throwaway host like production: a normal deploy, an unhealthy release, a deploy killed partway, and a migration the previous release cannot run against | planned |
+| RMI-DEPLOYFORGE-031 | `--format json` reports from `ship`, `release`, `rollback` and `status`: the outcome, the phase and step that failed, what was kept or restored, and whether the migration completed | done |
+| RMI-DEPLOYFORGE-032 | Operator documentation: the expand-then-contract migration rule, local builds and JSON reports in the Quick Start | done |
+| RMI-DEPLOYFORGE-033 | The first stack deployed by deployforge in production | planned |
+| RMI-DEPLOYFORGE-034 | A month of real use recorded: every deploy, failure and rollback in the ledger, with a note on each failure | planned |

@@ -1,6 +1,6 @@
 # Deploying
 
-This guide covers deploying a release to a stack, rolling it back, clearing a stale lock, reading status, what runs on the host, the deploy ledger, hooks, and packaging a release archive. For a first deploy, see [Getting started](getting-started.md). To move a stack from another tool, see [Taking over a stack](taking-over.md). For the fields these commands read, see [Fleet document](fleet-document.md).
+This guide covers deploying a release to a stack, rolling it back, clearing a stale lock, reading status, what runs on the host, migrations a rollback can survive, reports for scripts and agents, the deploy ledger, hooks, and packaging a release archive. For a first deploy, see [Getting started](getting-started.md). To move a stack from another tool, see [Taking over a stack](taking-over.md). For the fields these commands read, see [Fleet document](fleet-document.md).
 
 ## How a deploy runs
 
@@ -27,6 +27,7 @@ These flags and variables apply to every `deploy` command:
 | `--keep` | Releases kept on the host, at least 2. Default 5. |
 | `--ledger-dir` | Directory of the ledger files. Default `deployments`. |
 | `--hooks` | Directory of hook scripts. Default `.deployforge/hooks`. |
+| `--format` | `text`, or `json` for one JSON report on standard output from `ship`, `release`, `rollback` and `status`. See [Reports](#reports). Default `text`. |
 
 `AWS_PROFILE` and `AWS_REGION` select the AWS profile and region when secrets are in SSM.
 
@@ -130,11 +131,41 @@ For one release, the host runs these steps in order:
 5. Migrate: run the new binary's `migrate` as the stack's user, with the migrate-only variables in a temporary environment file removed afterwards.
 6. Switch: point `/opt/<unit>/current` at the new release and restart the unit.
 7. Readiness: wait for `/readyz` on the loopback port, once for each host name in the `Host` header, until `--health-timeout`.
-8. Restore: if any step fails, put back the previous release and files, restart, and check readiness again. The error names the step that failed. Completed migrations stay applied.
+8. Restore: if any step fails, put back the previous release and files, restart, and check readiness again. The error names the step that failed. Completed migrations stay applied; see [Migrations](#migrations).
 9. Prune: keep the newest `--keep` releases, and always the live one and the one it replaced; remove the rest.
 10. Audit: write one JSON line for the action in the app's directory on the host, then unlock.
 
 When the fleet document turns on `selfcheck`, the app's `selfcheck` subcommand runs before and after the switch, as `--selfcheck` says.
+
+## Migrations
+
+A rollback, and the restore after a failed deploy, switch the code back. They never reverse a migration. The previous release then runs against the schema the new release migrated, so every migration must work with the release before it. Make each schema change in two releases, expand then contract:
+
+1. **Expand.** Add what the new code needs: a new table, or a column that is nullable or has a default. The old code ignores it. Write to both the old and new shapes where the code moves data across.
+2. **Contract.** Once no release you could roll back to uses the old shape, remove it in a later release.
+
+A change that the previous release cannot run against is not safe to deploy unattended. That includes dropping or renaming a column or table it reads, adding a `NOT NULL` column without a default, or narrowing a type. Split it as above. If you can't, deploy it by hand, after `ship` has taken its snapshot, and plan to restore the snapshot instead of rolling back.
+
+A failed deploy says whether its migration completed: the error, and `failure.migrated` in a [report](#reports). When it did, the previous release is running on the migrated schema.
+
+## Reports
+
+With `--format json`, `ship`, `release`, `rollback` and `status` write one JSON document to standard output and send their progress to standard error. An agent or a script reads the report instead of the prose. The exit status still says whether the command failed.
+
+```json
+{"command":"ship","app":"example-app","stack":"prod","ok":false,"phase":"deploy",
+ "error":"…","failure":{"step":"health","kept":false,"restored":true,"migrated":true,"error":"…"},
+ "snapshot":"example-app-prod-…"}
+```
+
+| Field | Meaning |
+|---|---|
+| `ok` | The command did all it set out to. |
+| `phase` | Where it failed: `preflight` (checks before packaging), `package`, `snapshot`, `deploy`, `public-check`, or `status`. |
+| `failure` | How the host's part failed, when it got that far. `step` is `unpack`, `install`, `validate`, `selfcheck-pre`, `migrate`, `switch`, `health` or `selfcheck-post`. `kept` means the running release was never switched away from. `restored` means the previous release and its files run again. `stopped` means a first release failed, so nothing runs. `migrated` means the release's migration completed and stays applied. |
+| `entry` | The ledger entry recorded. A ship that failed its `public-check` has one: the release is live and recorded. |
+| `snapshot` | The database snapshot `ship` took first. |
+| `status`, `ledger` | For `status`: what the host reports, and the ledger's current release. |
 
 ## The ledger
 

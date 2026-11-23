@@ -93,9 +93,20 @@ make build   # in a deployforge checkout: bin/deployforge-linux-amd64 for the ho
 deployforge deploy ship example-app prod --tag v1.2.0 \
   --host-binary bin/deployforge-linux-amd64
 
+# A development deploy: a pushed commit on main, untagged; the archive and
+# the ledger still name its commit.
+deployforge deploy ship example-app prod --local
+
+# The same outcome as one JSON report, for a script or an agent.
+deployforge deploy ship example-app prod --tag v1.2.0 --format json
+
 deployforge ledger show example-app prod
 deployforge deploy rollback example-app prod
 ```
+
+Every migration must work with the release before it, because a rollback
+switches the code back but never the schema; the
+[Deploying guide](docs/guides/deploying.md#migrations) says how.
 
 The app's repository has a release script, `ops/host/release.sh` by
 default, that builds the app for linux/amd64 and runs
