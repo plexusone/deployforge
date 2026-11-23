@@ -1,6 +1,7 @@
 package host
 
 import (
+	"github.com/grokify/oscompat/testutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,6 +53,7 @@ func TestTheScriptIsValidBashAndNamesTheStack(t *testing.T) {
 // stubs writes fake system commands that log what they were asked to do.
 func stubs(t *testing.T, log string) string {
 	t.Helper()
+	testutil.RequirePOSIX(t, "the host-setup script runs with stubbed Linux commands")
 	dir := t.TempDir()
 	for _, name := range []string{"id", "useradd", "install", "systemctl"} {
 		body := "#!/bin/bash\necho \"" + name + " $*\" >> '" + log + "'\n"

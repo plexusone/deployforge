@@ -2,6 +2,7 @@ package ship
 
 import (
 	"context"
+	"github.com/grokify/oscompat/testutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,6 +21,7 @@ echo "$(cat VERSION) $DEPLOYFORGE $DEPLOYFORGE_FLEET" > "$out/site-0123abc.tgz"
 
 func run(t *testing.T, dir string, args ...string) string {
 	t.Helper()
+	testutil.RequirePOSIX(t, "the release scripts are shell scripts run as programs")
 	cmd := exec.Command(args[0], args[1:]...) //nolint:gosec // G204: the test's own git commands
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")

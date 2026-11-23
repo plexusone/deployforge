@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	oscfs "github.com/grokify/oscompat/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -141,7 +142,7 @@ func TestExtractWritesFilesWithNormalizedModes(t *testing.T) {
 			t.Errorf("%s: %v", name, err)
 			continue
 		}
-		if st.Mode().Perm() != want {
+		if oscfs.PermissionsEnforced() && st.Mode().Perm() != want {
 			t.Errorf("%s: mode %v, want %v", name, st.Mode().Perm(), want)
 		}
 	}

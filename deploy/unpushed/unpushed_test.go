@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-		"github.com/plexusone/deployforge/internal/fleettest"
+	"github.com/plexusone/deployforge/internal/fleettest"
 	"github.com/plexusone/deployforge/ledger"
 	"github.com/plexusone/deployforge/provenance"
 )
@@ -44,7 +44,6 @@ func checkout(t *testing.T, src, repo string) (pushed, local string) {
 	run(t, dir, "git", "commit", "--quiet", "--allow-empty", "-m", "two")
 	return pushed, run(t, dir, "git", "rev-parse", "HEAD")
 }
-
 
 const sum = "0000000000000000000000000000000000000000000000000000000000000000"
 

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/grokify/oscompat/testutil"
 	"io"
 	"os"
 	"path/filepath"
@@ -118,6 +119,7 @@ type rig struct {
 
 func newRig(t *testing.T) *rig {
 	t.Helper()
+	testutil.RequirePOSIX(t, "its fake app and systemctl are shell scripts run as programs")
 	root := t.TempDir()
 	for _, d := range []string{"opt/one-cloud/releases", "etc/one-cloud"} {
 		if err := os.MkdirAll(filepath.Join(root, d), 0o750); err != nil {

@@ -3,6 +3,7 @@ package hooks
 import (
 	"bytes"
 	"context"
+	"github.com/grokify/oscompat/testutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 func write(t *testing.T, dir, name, body string, mode os.FileMode) {
 	t.Helper()
+	testutil.RequirePOSIX(t, "the hooks are shell scripts run as programs")
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(body), mode); err != nil {
 		t.Fatal(err)
 	}

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/grokify/oscompat/testutil"
 	"io"
 	"os"
 	"os/exec"
@@ -168,6 +169,7 @@ type rig struct {
 
 func newRig(t *testing.T) *rig {
 	t.Helper()
+	testutil.RequirePOSIX(t, "its fake host runs shell scripts as programs and answers with Linux paths")
 	f, err := fleet.Parse([]byte(fleetJSON))
 	if err != nil {
 		t.Fatal(err)
