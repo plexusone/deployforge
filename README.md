@@ -1,8 +1,8 @@
-# deployforge
+# DeployForge
 
 Ship Go apps to your own servers: release archives, not containers.
 
-deployforge deploys Go web apps to hosts you already have. Each app is a
+DeployForge deploys Go web apps to hosts you already have. Each app is a
 single binary with a YAML config, run by systemd behind Caddy, with its
 secrets in a parameter store. A deploy builds a release from a clean,
 tagged commit, ships it with the app's config and secrets, runs the app's
