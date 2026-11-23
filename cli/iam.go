@@ -44,7 +44,9 @@ func iamTargets(f *fleet.Fleet, args []string) ([]stackiam.Target, error) {
 		}
 		return out, nil
 	}
-	for i := 0; i < len(args); i += 2 {
+	// The count is even, so each app has its stack; i+1 < len says so to
+	// the compiler and to gosec.
+	for i := 0; i+1 < len(args); i += 2 {
 		a, _, err := f.Stack(args[i], args[i+1])
 		if err != nil {
 			return nil, err
