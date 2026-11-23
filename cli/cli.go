@@ -24,6 +24,7 @@ import (
 	"github.com/plexusone/deployforge/deploy/hooks"
 	"github.com/plexusone/deployforge/deploy/hostaddr"
 	"github.com/plexusone/deployforge/deploy/onhost"
+	"github.com/plexusone/deployforge/deploy/report"
 	"github.com/plexusone/deployforge/deploy/secrets"
 	"github.com/plexusone/deployforge/deploy/secrets/awsssm"
 	"github.com/plexusone/deployforge/deploy/systemd"
@@ -282,7 +283,7 @@ func releaseCmd(load func() (*fleet.Fleet, error)) *cobra.Command {
 }
 
 func deployCmd(load func() (*fleet.Fleet, error), fleetPath *string, o Options) *cobra.Command {
-	var ledgerDir, hostBinary, sshKey, operator, hooksDir string
+	var ledgerDir, hostBinary, sshKey, operator, hooksDir, format string
 	var healthTimeout, keep int
 	root := &cobra.Command{
 		Use:   "deploy",
@@ -313,6 +314,22 @@ Environment:
 	pf.IntVar(&healthTimeout, "health-timeout", 60, "seconds to wait for every host name to answer /readyz after a restart")
 	pf.IntVar(&keep, "keep", 5, "releases kept on the host, at least 2")
 	pf.StringVar(&hooksDir, "hooks", hooks.DefaultDir, "directory of hook scripts run around a deploy: "+strings.Join(hooks.Names(), ", "))
+	pf.StringVar(&format, "format", formatText, "text, or json for one JSON report on standard output (ship, release, rollback and status)")
+	root.PersistentPreRunE = func(c *cobra.Command, _ []string) error {
+		// cobra runs only the nearest hook, so run the one above deploy's.
+		for p := root.Parent(); p != nil; p = p.Parent() {
+			if p.PersistentPreRunE != nil {
+				if err := p.PersistentPreRunE(c, nil); err != nil {
+					return err
+				}
+				break
+			}
+		}
+		if format != formatText && format != formatJSON {
+			return fmt.Errorf("deploy: --format %q is not text or json", format)
+		}
+		return nil
+	}
 
 	newDeployer := func(c *cobra.Command) (*deployer.Deployer, error) {
 		f, err := load()
@@ -345,11 +362,7 @@ Environment:
 			}
 			ro.App, ro.Stack = args[0], args[1]
 			e, err := d.Release(c.Context(), ro)
-			if err != nil {
-				return err
-			}
-			_, err = fmt.Fprintf(c.OutOrStdout(), "%s/%s now runs %s\n", e.App, e.Stack, e.Release)
-			return err
+			return finish(c, format, &report.Report{Command: "release", App: ro.App, Stack: ro.Stack}, e, err)
 		},
 	}
 	fl := rel.Flags()
@@ -371,14 +384,10 @@ Environment:
 				return err
 			}
 			e, err := d.Rollback(c.Context(), args[0], args[1])
-			if err != nil {
-				return err
-			}
-			_, err = fmt.Fprintf(c.OutOrStdout(), "%s/%s now runs %s\n", e.App, e.Stack, e.Release)
-			return err
+			return finish(c, format, &report.Report{Command: "rollback", App: args[0], Stack: args[1]}, e, err)
 		},
 	})
-	root.AddCommand(shipCmd(load, fleetPath, newDeployer, openStore, lightsailOpener(o), preflightFor(o, fleetPath)))
+	root.AddCommand(shipCmd(load, fleetPath, &format, newDeployer, openStore, lightsailOpener(o), preflightFor(o, fleetPath)))
 	root.AddCommand(&cobra.Command{
 		Use:   "unlock <app> <stack>",
 		Short: "Remove the stack's deploy lock, left by a deploy that was cut off",
@@ -453,15 +462,25 @@ Environment:
 			if err != nil {
 				return err
 			}
+			r := &report.Report{Command: "status", App: args[0], Stack: args[1]}
 			st, err := d.Status(c.Context(), args[0], args[1])
 			if err != nil {
-				return err
+				return finish(c, format, r, ledger.Entry{}, err)
 			}
 			entries, err := ledger.Read(ledger.Path(ledgerDir, d.Fleet, mustApp(d.Fleet, args[0]), args[1]))
 			if err != nil {
-				return err
+				return finish(c, format, r, ledger.Entry{}, err)
 			}
-			return writeStatus(c.OutOrStdout(), args[0], args[1], st, entries)
+			if format != formatJSON {
+				return writeStatus(c.OutOrStdout(), args[0], args[1], st, entries)
+			}
+			r.Status = st
+			if cur, ok := ledger.Current(entries); ok {
+				r.Ledger = cur.Release
+			}
+			// writeStatus's prose goes to standard error; its verdict is
+			// the report's.
+			return finish(c, format, r, ledger.Entry{}, writeStatus(c.ErrOrStderr(), args[0], args[1], st, entries))
 		},
 	})
 	return root
@@ -485,6 +504,37 @@ func mustApp(f *fleet.Fleet, name string) fleet.App {
 
 // writeStatus prints a stack's host state and how it agrees with the
 // ledger, and returns an error when they disagree.
+const (
+	formatText = "text"
+	formatJSON = "json"
+)
+
+// finish reports a release, rollback or status: a line of prose, or with
+// --format json the report on standard output. A failure is returned either
+// way, so the exit status says it too.
+func finish(c *cobra.Command, format string, r *report.Report, e ledger.Entry, err error) error {
+	phase := report.PhaseDeploy
+	if r.Command == "status" {
+		phase = report.PhaseStatus
+	}
+	if err != nil {
+		r.Fail(phase, err)
+	} else {
+		r.OK = true
+		if e.Release != "" {
+			r.Entry = &e
+		}
+	}
+	if format == formatJSON {
+		return errors.Join(err, r.Write(c.OutOrStdout()))
+	}
+	if err != nil || e.Release == "" {
+		return err
+	}
+	_, err = fmt.Fprintf(c.OutOrStdout(), "%s/%s now runs %s\n", e.App, e.Stack, e.Release)
+	return err
+}
+
 func writeStatus(w io.Writer, app, stack string, st *onhost.Status, entries []ledger.Entry) error {
 	live := cmp.Or(st.Live, "none")
 	lines := []string{
@@ -707,6 +757,13 @@ func onHostCmd() *cobra.Command {
 			}
 			h := &onhost.Host{Sys: onhost.Systemd{}, Log: c.ErrOrStderr()}
 			res, err := h.Run(c.Context(), req, work)
+			if f, ok := onhost.FailureOf(err); ok {
+				// The operator's side reads how it failed from standard
+				// output; the error on standard error says it in words.
+				if encErr := json.NewEncoder(c.OutOrStdout()).Encode(onhost.Result{Failure: &f}); encErr != nil {
+					return errors.Join(err, encErr)
+				}
+			}
 			if err != nil {
 				return err
 			}

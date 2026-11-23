@@ -14,6 +14,7 @@ import (
 	"github.com/plexusone/deployforge/deploy/deployer"
 	"github.com/plexusone/deployforge/deploy/hooks"
 	"github.com/plexusone/deployforge/deploy/readiness"
+	"github.com/plexusone/deployforge/deploy/report"
 	"github.com/plexusone/deployforge/deploy/secrets"
 	"github.com/plexusone/deployforge/deploy/ship"
 	"github.com/plexusone/deployforge/fleet"
@@ -21,7 +22,7 @@ import (
 
 // shipCmd is a whole routine deploy in one command: package the tag in a
 // temporary worktree, deploy it, and check every host name from outside.
-func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer func(*cobra.Command) (*deployer.Deployer, error),
+func shipCmd(load func() (*fleet.Fleet, error), fleetPath, format *string, newDeployer func(*cobra.Command) (*deployer.Deployer, error),
 	openStore func(*cobra.Command) (secrets.Store, error), openLightsail func(*cobra.Command) (dbsnapshot.API, error),
 	preflight func(c *cobra.Command, f *fleet.Fleet, a fleet.App, stack string) error) *cobra.Command {
 	var tag, repo, config, ref, script, selfcheck string
@@ -50,6 +51,26 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer f
 		Args: cobra.ExactArgs(2),
 		RunE: func(c *cobra.Command, args []string) (err error) {
 			app, stack := args[0], args[1]
+			// With --format json, standard output holds only the report;
+			// the progress lines go to standard error.
+			asJSON := *format == formatJSON
+			progress := c.OutOrStdout()
+			if asJSON {
+				progress = c.ErrOrStderr()
+			}
+			r := &report.Report{Command: "ship", App: app, Stack: stack}
+			phase := report.PhasePreflight
+			defer func() {
+				if !asJSON {
+					return
+				}
+				if err != nil {
+					r.Fail(phase, err)
+				} else {
+					r.OK = true
+				}
+				err = errors.Join(err, r.Write(c.OutOrStdout()))
+			}()
 			f, err := load()
 			if err != nil {
 				return err
@@ -96,8 +117,8 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer f
 			for _, r := range allowUnpushed {
 				allow[r] = true
 			}
-			say := func(format string, args ...any) error {
-				_, err := fmt.Fprintf(c.OutOrStdout(), format+"\n", args...)
+			say := func(msg string, args ...any) error {
+				_, err := fmt.Fprintf(progress, msg+"\n", args...)
 				return err
 			}
 			if f.Credentials != nil && !noPreflight {
@@ -108,6 +129,7 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer f
 					return err
 				}
 			}
+			phase = report.PhasePackage
 			if err := say("packaging %s in a temporary worktree", app); err != nil {
 				return err
 			}
@@ -145,6 +167,7 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer f
 				return err
 			}
 			if takesSnapshot(f, a, stack) && !noSnapshot {
+				phase = report.PhaseSnapshot
 				api, err := openLightsail(c)
 				if err != nil {
 					return err
@@ -160,16 +183,20 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath *string, newDeployer f
 				if err != nil {
 					return fmt.Errorf("ship: the snapshot before the deploy failed, so nothing was deployed: %w", err)
 				}
+				r.Snapshot = snap.Name
 				if err := say("snapshot %s is %s", snap.Name, snap.State); err != nil {
 					return err
 				}
 			}
+			phase = report.PhaseDeploy
 			e, err := d.Release(c.Context(), deployer.ReleaseOptions{
 				App: app, Stack: stack, Archive: p.Archive, Config: config, Tag: tag, Selfcheck: selfcheck,
 			})
 			if err != nil {
 				return err
 			}
+			r.Entry = &e
+			phase = report.PhasePublic
 			if err := say("%s/%s now runs %s", app, stack, e.Release); err != nil {
 				return err
 			}
