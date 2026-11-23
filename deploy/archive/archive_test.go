@@ -4,11 +4,12 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
-	oscfs "github.com/grokify/oscompat/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	oscfs "github.com/grokify/oscompat/fs"
 )
 
 type entry struct {

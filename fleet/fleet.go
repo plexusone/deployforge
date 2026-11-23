@@ -11,12 +11,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	oscfs "github.com/grokify/oscompat/fs"
 	"maps"
 	"os"
 	"regexp"
 	"slices"
 	"strings"
+
+	oscfs "github.com/grokify/oscompat/fs"
 )
 
 // FormatVersion is the version of the fleet document format this package

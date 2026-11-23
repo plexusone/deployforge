@@ -7,13 +7,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/grokify/oscompat/testutil"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/grokify/oscompat/testutil"
 
 	"github.com/plexusone/deployforge/deploy/secrets"
 	"github.com/plexusone/deployforge/deploy/target"

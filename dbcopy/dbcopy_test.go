@@ -51,7 +51,7 @@ func elsewhere() *fleet.Fleet {
 				Host: "web-1", Hosts: []string{"one.example.com"}, Port: 8101, Status: fleet.Elsewhere,
 				Databases: []fleet.Database{
 					{Name: "one_auth", OwnerDSN: "AUTH_DB_DSN"},
-					{Name: "one", AppRole: true, OwnerDSN: "migrate/ONE_PG_ADMIN_DSN", AppDSN: "ONE_PG_DSN", AppPassword: "migrate/ONE_APP_PASSWORD"},
+					{Name: "one", AppRole: true, OwnerDSN: "migrate/ONE_PG_ADMIN_DSN", AppDSN: "ONE_PG_DSN", AppPassword: "migrate/ONE_APP_PASSWORD"}, //nolint:gosec // G101: This is an environment variable name, not a credential
 				},
 				Limits: &fleet.Limits{MemoryMax: "512M", CPUQuota: "50%", ConnectionLimit: 10},
 			}},

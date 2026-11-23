@@ -2,12 +2,13 @@ package ship
 
 import (
 	"context"
-	"github.com/grokify/oscompat/testutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/grokify/oscompat/testutil"
 )
 
 // A release script that records where it ran and what it was given, and

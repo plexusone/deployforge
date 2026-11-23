@@ -40,7 +40,8 @@ func TestRender(t *testing.T) {
 	)
 	log := credspec.NewLog()
 	at := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
-	if err := log.Append(reg, credspec.Event{Credential: "one-cloud/prod/SESSION_KEY", Type: credspec.EventCreated, At: at, By: "ops"}); err != nil {
+	created := credspec.Event{Credential: "one-cloud/prod/SESSION_KEY", Type: credspec.EventCreated, At: at, By: "ops"} //nolint:gosec // G101: A credential's ID or name in a registry, not its value
+	if err := log.Append(reg, created); err != nil {
 		t.Fatal(err)
 	}
 	page, err := Render(f, "one-cloud", "prod", reg, log, Options{Tool: []string{"deployforge", "credentials"}, Now: func() time.Time { return at }})

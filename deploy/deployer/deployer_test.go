@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/grokify/oscompat/testutil"
 	"io"
 	"os"
 	"os/exec"
@@ -17,6 +16,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/grokify/oscompat/testutil"
 
 	"github.com/plexusone/deployforge/deploy/archive"
 	"github.com/plexusone/deployforge/deploy/hooks"

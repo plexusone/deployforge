@@ -3,11 +3,12 @@ package hooks
 import (
 	"bytes"
 	"context"
-	"github.com/grokify/oscompat/testutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/grokify/oscompat/testutil"
 )
 
 func write(t *testing.T, dir, name, body string, mode os.FileMode) {

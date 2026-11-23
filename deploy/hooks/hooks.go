@@ -12,13 +12,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	oscfs "github.com/grokify/oscompat/fs"
 	"io"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
+
+	oscfs "github.com/grokify/oscompat/fs"
 )
 
 // Hook names.

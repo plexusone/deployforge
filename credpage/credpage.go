@@ -76,7 +76,11 @@ func Render(f *fleet.Fleet, app, stack string, reg *credspec.Registry, log *cred
 	})
 	data := page{
 		Title: app + " " + stack + " credentials", App: a, Stack: stack, Hosts: s.Hosts, Status: string(s.Status),
-		Rows: rows, Style: template.CSS(rb.Style), Script: template.JS(rb.Script), Generated: now().UTC().Format("2006-01-02 15:04 UTC"),
+		Rows: rows, Generated: now().UTC().Format("2006-01-02 15:04 UTC"),
+		// The style sheet and the script are systemspec-runbook's constants,
+		// compiled in; nothing a fleet, registry or log holds reaches them.
+		Style:  template.CSS(rb.Style), //nolint:gosec // G203: a constant compiled in, not input
+		Script: template.JS(rb.Script), //nolint:gosec // G203: a constant compiled in, not input
 	}
 	for _, r := range rows {
 		if r.Recorded != "" {

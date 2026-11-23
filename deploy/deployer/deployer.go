@@ -206,7 +206,6 @@ func (d *Deployer) Release(ctx context.Context, o ReleaseOptions) (ledger.Entry,
 
 // release reads the secrets, runs the release on the host and records it.
 func (d *Deployer) release(ctx context.Context, t target.Target, o ReleaseOptions, id, previous string, config []byte, checked archive.Checked) (ledger.Entry, error) {
-
 	d.logf("reading secrets from %s", t.SecretPrefix)
 	bundle, err := secrets.Load(ctx, d.Store, t.SecretPrefix)
 	if err != nil {

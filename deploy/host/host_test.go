@@ -1,12 +1,13 @@
 package host
 
 import (
-	"github.com/grokify/oscompat/testutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/grokify/oscompat/testutil"
 
 	"github.com/plexusone/deployforge/deploy/systemd"
 	"github.com/plexusone/deployforge/fleet"

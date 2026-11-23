@@ -46,7 +46,7 @@ func withDatabases() *fleet.Fleet {
 	prod := f.Apps[0].Stacks["prod"]
 	prod.Databases = []fleet.Database{
 		{Name: "one_auth", OwnerDSN: "AUTH_DB_DSN"},
-		{Name: "one", AppRole: true, OwnerDSN: "migrate/ONE_PG_ADMIN_DSN", AppDSN: "ONE_PG_DSN", AppPassword: "migrate/ONE_APP_PASSWORD"},
+		{Name: "one", AppRole: true, OwnerDSN: "migrate/ONE_PG_ADMIN_DSN", AppDSN: "ONE_PG_DSN", AppPassword: "migrate/ONE_APP_PASSWORD"}, //nolint:gosec // G101: This is an environment variable name, not a credential
 	}
 	f.Apps[0].Stacks["prod"] = prod
 	return f
