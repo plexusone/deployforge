@@ -160,19 +160,23 @@ When the fleet document has a `credentials` section, `deploy ship` checks that e
 
 ```bash
 deployforge iam plan
-deployforge iam apply example-app prod
+deployforge iam policy example-app prod --account 123456789012
+deployforge iam apply example-app prod --confirm
 deployforge iam verify
 ```
 
-`iam <plan|apply|verify> [<app> <stack>]...` makes, for each named stack or every live one:
+`iam <plan|apply|verify|policy> [<app> <stack>]...` makes, for each named stack or every live one:
 
 - a policy `ssm-<app>-<stack>` that reads and writes the SSM parameters under the stack's secret prefix and lists parameter names;
 - a group `<app>-<stack>-operators` with the policy attached.
 
 Group members are reported, never changed. `plan` lists what is missing, `apply` creates it and checks again, and `verify` fails unless everything is in place. Nothing is deleted.
 
+`apply` changes the account's IAM, so it needs `--confirm`: without it, it shows the plan, changes nothing, and says to run again with `--confirm`. `policy` prints one stack's policy document for review, with `--account` naming the account the document is for; it reads no AWS account.
+
 Flags:
 
 - `--path`: the IAM path of the policies and groups. Default `/deployforge/`.
-- `--account`: refuse to act unless the AWS profile is this account.
+- `--account`: refuse to act unless the AWS profile is this account; with `policy`, the account the document names.
+- `--confirm`: with `apply`, make the changes the plan shows.
 - `--region`: the region of the parameters. Default `$AWS_REGION`.

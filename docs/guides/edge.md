@@ -130,3 +130,15 @@ An example of `issue` with a CSR you made elsewhere:
 ```bash
 deployforge origin-cert issue example.com --days 365 -o example.com.pem < example.com.csr
 ```
+
+## Cloudflare's ranges
+
+Caddy and the host's firewall trust Cloudflare's proxy ranges, which deployforge carries in `deploy/cfranges/ips-v4.txt` and `ips-v6.txt`. Cloudflare changes them rarely.
+
+```bash
+deployforge cloudflare-ips --check
+deployforge cloudflare-ips --dir deploy/cfranges
+```
+
+- `cloudflare-ips --check` compares the ranges this build carries with the lists Cloudflare publishes, and fails when Cloudflare has added or removed one. Run it in a scheduled job.
+- `cloudflare-ips` writes the published lists to `--dir` (default `deploy/cfranges`), for review and a release of deployforge.

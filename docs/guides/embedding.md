@@ -101,6 +101,7 @@ Every field is optional. A nil function uses the default, which is the real serv
 | `OriginCA` | Opens Cloudflare's Origin CA. The official client, with the token in `CLOUDFLARE_API_TOKEN`, when nil. |
 | `IAM` | Opens the clients the `iam` command uses. IAM and STS with the default AWS configuration when nil. |
 | `CredentialConnector` | Reaches the credential stores for the check before a deploy. credforge's, through the targets, when nil. |
+| `ReleaseEnv` | Extra environment for an app's release script, as `NAME=value`, from the running binary's path and the fleet document's. For scripts at older tags that read other names for them. None when nil. |
 
 Their types are:
 
@@ -112,6 +113,7 @@ Lightsail           func(c *cobra.Command) (dbsnapshot.API, error)
 OriginCA            func() (origincert.API, error)
 IAM                 func(c *cobra.Command) (stackiam.Clients, error)
 CredentialConnector func(*targets.File) credforge.Connector
+ReleaseEnv          func(self, fleet string) []string
 ```
 
 Replace a field to use another secret store or transport, or to test your tool with fakes.

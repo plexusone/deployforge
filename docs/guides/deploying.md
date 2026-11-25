@@ -43,7 +43,24 @@ The config defaults to `stacks/<app>/<stack>/config.yaml`; set `--config` for an
 
 With `--tag`, `ship` fetches the tag from origin and packages it with `GOWORK` off. `--no-fetch` skips the fetch.
 
-The script receives the deployforge binary in `DEPLOYFORGE` and the fleet document in `DEPLOYFORGE_FLEET`. It builds the app for linux/amd64 and runs `$DEPLOYFORGE release package`. See [Release package](#release-package).
+The script receives the deployforge binary in `DEPLOYFORGE` and the fleet document in `DEPLOYFORGE_FLEET`. It builds the app for linux/amd64 and runs `$DEPLOYFORGE release package`. See [Release package](#release-package). A program that embeds the CLI can add environment for scripts at older tags that read other names, with `Options.ReleaseEnv` (see [Embedding](embedding.md)); `release package` also accepts `--sites` as an older name of `--fleet`.
+
+The script must be executable in the commit being packaged, which is the mode git recorded (`100755`), not the mode in your checkout. `ship` reads it before running the script and stops when it is not, with the fix:
+
+```bash
+git update-index --chmod=+x ops/host/release.sh
+git commit -m "fix(ops): make the release script executable"
+```
+
+Then tag again. A shell script beside it that is not executable is reported as a warning, since the release script may run it.
+
+### Dry run
+
+`--dry-run` packages and checks the release, then stops. Nothing is snapshotted, deployed or recorded:
+
+```bash
+deployforge deploy ship example-app prod --tag v1.2.0 --dry-run
+```
 
 ### Local builds
 
@@ -74,6 +91,7 @@ When the fleet document names a credential registry, `ship` first checks that ev
 |---|---|
 | `--selfcheck` | `enforce`, `report` or `off`: run the app's self-check, if the fleet document turns it on. Default `report`. |
 | `--skip-public-check` | Do not check the host names from outside afterwards. |
+| `--dry-run` | Package and check the release only; deploy nothing. |
 
 ## deploy release
 

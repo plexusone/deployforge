@@ -61,7 +61,7 @@ The primary stack decides names. The unit and Unix user of the primary stack are
 | `name` | The app's name: its binary, and with the stack, its unit, user and paths. |
 | `repo` | The repository that builds the binary, as `<host>/<owner>/<repo>`. |
 | `domain` | The DNS zone every host name of the app is in. Each stack host name must be the domain or end in `.<domain>`. |
-| `edge` | `cloudflare`, or empty for none. With `cloudflare`, Caddy serves the zone's origin certificate and trusts Cloudflare's addresses to name the client. With none, Caddy gets its own certificates. An app behind `cloudflare` needs `domain`. |
+| `edge` | `cloudflare`, or empty for none. With `cloudflare`, Caddy serves the zone's origin certificate and trusts Cloudflare's addresses to name the client. With none, Caddy gets its own certificates. An app behind `cloudflare` needs `domain`, and each of its host names must be the domain or one label under it, such as `app.example.com`: the zone's certificates cover only the zone and `*.zone`. |
 | `secretPrefix` | Where the app's secrets are in the parameter store. Starts and ends with `/` and contains `{stack}`. |
 | `stateDirectory` | The app keeps state on local disk, so its unit gets a private writable state directory. |
 | `selfcheck` | A deploy runs the app's `selfcheck` subcommand before and after the switch. See [Deploying](deploying.md). |

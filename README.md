@@ -72,7 +72,8 @@ Your repository keeps the configuration; deployforge is the binary.
 | `credentials check\|generate\|install\|review\|status\|record\|report\|validate\|…` | The fleet's credential registry: observe the stores, generate or install a value, review, record and report |
 | `credentials setup --system <app> --env <stack> list\|show\|run\|verify\|doc` | Set a stack's credentials up step by step, from a runbook built from the registry |
 | `credentials page <app> <stack>` | An HTML page of what the stack's credentials are, how each is made, whether it is recorded, and how to set them up |
-| `iam plan\|apply\|verify [<app> <stack>]…` | Each stack's parameter-store IAM policy and operators' group |
+| `iam plan\|apply\|verify\|policy [<app> <stack>]…` | Each stack's parameter-store IAM policy and operators' group; `apply` needs `--confirm`, `policy` prints one document offline |
+| `cloudflare-ips [--check]` | Refresh the committed Cloudflare ranges, or check this build's against the published ones |
 
 ## Quick Start
 
@@ -111,7 +112,9 @@ switches the code back but never the schema; the
 The app's repository has a release script, `ops/host/release.sh` by
 default, that builds the app for linux/amd64 and runs
 `$DEPLOYFORGE release package <app> --fleet $DEPLOYFORGE_FLEET --repo . --from <build dir>`
-with the arguments it was given.
+with the arguments it was given. The script must be committed executable
+(git mode 100755): `deploy ship` checks the mode in the commit it packages
+and stops with the fix when it is not.
 
 ## Taking over a running stack
 
