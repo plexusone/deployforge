@@ -17,12 +17,14 @@ package ship
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -71,6 +73,10 @@ type Options struct {
 	// repositories AllowUnpushed names.
 	RequirePushed bool
 	AllowUnpushed map[string]bool
+	// Env is extra environment for the release script, as NAME=value, after
+	// DEPLOYFORGE and DEPLOYFORGE_FLEET: for scripts at older tags that read
+	// other names for the same paths.
+	Env []string
 	// Log receives the commands' output.
 	Log io.Writer
 }
@@ -188,6 +194,9 @@ func Build(ctx context.Context, o Options) (_ *Package, err error) {
 	if _, err := os.Stat(script); err != nil {
 		return nil, fmt.Errorf("ship: %s at %s has no %s", o.App, ref, scriptPath)
 	}
+	if err := checkModes(o.Repo, commit, filepath.ToSlash(filepath.Clean(scriptPath)), o.Log); err != nil {
+		return nil, fmt.Errorf("ship: %s at %s: %w", o.App, ref, err)
+	}
 	out := filepath.Join(dir, "dist")
 	args := []string{"--out", out}
 	// Without a local build, no go.work in the operator's shell may choose
@@ -208,6 +217,7 @@ func Build(ctx context.Context, o Options) (_ *Package, err error) {
 	cmd := exec.CommandContext(ctx, script, args...) //nolint:gosec // G204: the app's own release script, at the commit shipped
 	cmd.Dir = tree
 	cmd.Env = append(withoutEnv(os.Environ(), "GOWORK"), "GOWORK="+gowork, "DEPLOYFORGE="+o.Deployforge, "DEPLOYFORGE_FLEET="+o.Fleet)
+	cmd.Env = append(cmd.Env, o.Env...)
 	cmd.Stdout, cmd.Stderr = o.Log, o.Log
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("ship: %s's release script: %w", o.App, err)
@@ -221,6 +231,55 @@ func Build(ctx context.Context, o Options) (_ *Package, err error) {
 	}
 	p.Archive = archives[0]
 	return p, nil
+}
+
+// ExecutableMode is git's mode for an executable file.
+const ExecutableMode = "100755"
+
+// checkModes reads, in commit's tree, the mode git recorded for the release
+// script and the shell scripts beside it. The script itself must be
+// executable, or running it fails with "permission denied" in every
+// checkout of the commit, whatever the operator's own checkout has; a
+// script beside it that is not is reported to log, since the release
+// script may call it. Modes come from git, not the file system, so the
+// check is the same on every operating system.
+func checkModes(repo, commit, script string, log io.Writer) error {
+	dir := path.Dir(script)
+	spec := dir + "/"
+	if dir == "." {
+		spec = "."
+	}
+	out, err := git(repo, "ls-tree", commit, "--", spec)
+	if err != nil {
+		return fmt.Errorf("reading the modes of %s: %w: %s", spec, err, out)
+	}
+	var notExec []string
+	scriptMode := ""
+	for _, line := range strings.Split(out, "\n") {
+		meta, name, ok := strings.Cut(line, "\t")
+		if !ok {
+			continue
+		}
+		fields := strings.Fields(meta)
+		if len(fields) != 3 || fields[1] != "blob" {
+			continue
+		}
+		switch {
+		case name == script:
+			scriptMode = fields[0]
+		case strings.HasSuffix(name, ".sh") && fields[0] != ExecutableMode:
+			notExec = append(notExec, name)
+		}
+	}
+	for _, n := range notExec {
+		if _, err := fmt.Fprintf(log, "warning: %s is not executable in this commit; if the release script runs it, fix it with git update-index --chmod=+x %s, then commit and tag again\n", n, n); err != nil {
+			return err
+		}
+	}
+	if scriptMode != ExecutableMode {
+		return fmt.Errorf("the release script %s is not executable in this commit (mode %s): fix it with git update-index --chmod=+x %s, then commit and tag again", script, cmp.Or(scriptMode, "not found"), script)
+	}
+	return nil
 }
 
 // checkout adds a detached worktree of repo at commit, removed by Close.

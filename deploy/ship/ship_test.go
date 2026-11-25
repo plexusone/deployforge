@@ -283,3 +283,69 @@ func TestTheReleaseScriptCanBeNamedButStaysInTheRepository(t *testing.T) {
 		t.Errorf("a missing script: %v", err)
 	}
 }
+
+// TestTheReleaseScriptMustBeExecutableInTheTag checks the modes git
+// recorded: a release script committed without its executable bit stops
+// the build with the fix, and another script beside it only warns.
+func TestTheReleaseScriptMustBeExecutableInTheTag(t *testing.T) {
+	repo := gitRepo(t, "https://github.com/example/site.git", map[string]string{
+		ReleaseScript:         recordingScript,
+		"ops/host/helper.sh":  "#!/bin/sh\n",
+		"ops/host/README.txt": "notes",
+		"VERSION":             "tagged",
+	})
+	run(t, repo, "git", "update-index", "--chmod=-x", "ops/host/helper.sh")
+	run(t, repo, "git", "commit", "--quiet", "-m", "helper not executable")
+	run(t, repo, "git", "tag", "v1.0.0")
+	var log strings.Builder
+	p, err := Build(context.Background(), Options{App: "site", Repo: repo, Tag: "v1.0.0", Deployforge: "/bin/deployforge", Fleet: "/fleet.json", Log: &log})
+	if err != nil {
+		t.Fatalf("an executable release script with a non-executable helper: %v", err)
+	}
+	if err := p.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(log.String(), "warning: ops/host/helper.sh is not executable") || !strings.Contains(log.String(), "git update-index --chmod=+x ops/host/helper.sh") {
+		t.Errorf("no warning for the helper:\n%s", log.String())
+	}
+	if strings.Contains(log.String(), "README.txt") {
+		t.Error("a file that is not a shell script was reported")
+	}
+
+	run(t, repo, "git", "update-index", "--chmod=-x", ReleaseScript)
+	run(t, repo, "git", "commit", "--quiet", "-m", "script not executable")
+	run(t, repo, "git", "tag", "v1.0.1")
+	_, err = Build(context.Background(), Options{App: "site", Repo: repo, Tag: "v1.0.1", Deployforge: "/bin/deployforge", Fleet: "/fleet.json"})
+	if err == nil || !strings.Contains(err.Error(), "is not executable in this commit (mode 100644)") || !strings.Contains(err.Error(), "git update-index --chmod=+x "+ReleaseScript) {
+		t.Errorf("a non-executable release script: %v", err)
+	}
+}
+
+// TestExtraEnvironmentReachesTheReleaseScript checks that Options.Env is
+// set for the script, beside DEPLOYFORGE and DEPLOYFORGE_FLEET.
+func TestExtraEnvironmentReachesTheReleaseScript(t *testing.T) {
+	const envScript = `#!/bin/sh
+set -eu
+out=""
+while [ $# -gt 0 ]; do
+  case "$1" in --out) out="$2"; shift 2 ;; *) shift ;; esac
+done
+mkdir -p "$out"
+echo "$TOOL $TOOL_FLEET $DEPLOYFORGE" > "$out/site-0123abc.tgz"
+`
+	repo := gitRepo(t, "https://github.com/example/site.git", map[string]string{ReleaseScript: envScript})
+	run(t, repo, "git", "tag", "v1.0.0")
+	p, err := Build(context.Background(), Options{App: "site", Repo: repo, Tag: "v1.0.0", Deployforge: "/bin/deployforge", Fleet: "/fleet.json",
+		Env: []string{"TOOL=/bin/deployforge", "TOOL_FLEET=/fleet.json"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := p.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	if got := strings.TrimSpace(archiveText(t, p)); got != "/bin/deployforge /fleet.json /bin/deployforge" {
+		t.Errorf("the script saw %q", got)
+	}
+}
