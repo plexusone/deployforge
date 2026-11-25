@@ -249,6 +249,18 @@ type PulumiConfig struct {
 	Key   string `json:"key" jsonschema:"description=The configuration key\\, such as fleet:dbMasterPassword"`
 }
 
+// oneLabelUnder reports whether host is zone or one label under it, such
+// as app.example.com under example.com. Cloudflare's edge certificate for a
+// zone, and an origin certificate for the zone and its wildcard, cover only
+// those names; a.b.example.com would fail TLS.
+func oneLabelUnder(host, zone string) bool {
+	if host == zone {
+		return true
+	}
+	label, ok := strings.CutSuffix(host, "."+zone)
+	return ok && label != "" && !strings.Contains(label, ".")
+}
+
 // Edge is what is in front of an app's host names.
 type Edge string
 
@@ -535,6 +547,8 @@ func (f *Fleet) Validate() error {
 					bad(at, "host name %q is not a lowercase DNS name", h)
 				case a.Domain != "" && h != a.Domain && !strings.HasSuffix(h, "."+a.Domain):
 					bad(at, "host name %s is not in the app's domain %s", h, a.Domain)
+				case a.Edge == Cloudflare && !oneLabelUnder(h, a.Domain):
+					bad(at, "host name %s is more than one label under %s: behind cloudflare, the zone's certificate covers %s and *.%s only", h, a.Domain, a.Domain, a.Domain)
 				case names[h] != "":
 					bad(at, "host name %s is used by %s", h, names[h])
 				}

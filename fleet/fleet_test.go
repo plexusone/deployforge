@@ -284,3 +284,34 @@ func TestLabels(t *testing.T) {
 		t.Errorf("a bad label: %v", err)
 	}
 }
+
+// TestCloudflareHostsAreOneLabelUnderTheZone checks that, behind
+// cloudflare, a host name two labels under the zone is refused, since the
+// zone's certificates cover only the zone and its wildcard, and that
+// without an edge it is allowed.
+func TestCloudflareHostsAreOneLabelUnderTheZone(t *testing.T) {
+	f := load(t)
+	a := f.Apps[0]
+	a.Edge = Cloudflare
+	prod := a.Stacks["prod"]
+	prod.Hosts = []string{"app.example.com", "example.com", "api.app.example.com"}
+	a.Stacks["prod"] = prod
+	f.Apps[0] = a
+	err := f.Validate()
+	if err == nil || !strings.Contains(err.Error(), "host name api.app.example.com is more than one label under example.com") {
+		t.Errorf("a deep host behind cloudflare: %v", err)
+	}
+	if err != nil && (strings.Contains(err.Error(), "host name app.example.com is") || strings.Contains(err.Error(), "host name example.com is")) {
+		t.Errorf("the zone or a one-label host was refused: %v", err)
+	}
+	a.Edge = NoEdge
+	f.Apps[0] = a
+	if err := f.Validate(); err != nil {
+		t.Errorf("a deep host without an edge: %v", err)
+	}
+	for host, want := range map[string]bool{"example.com": true, "app.example.com": true, "a.b.example.com": false, "badexample.com": false} {
+		if got := oneLabelUnder(host, "example.com"); got != want {
+			t.Errorf("oneLabelUnder(%q) = %v", host, got)
+		}
+	}
+}
