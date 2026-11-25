@@ -24,10 +24,10 @@ import (
 // temporary worktree, deploy it, and check every host name from outside.
 func shipCmd(load func() (*fleet.Fleet, error), fleetPath, format *string, newDeployer func(*cobra.Command) (*deployer.Deployer, error),
 	openStore func(*cobra.Command) (secrets.Store, error), openLightsail func(*cobra.Command) (dbsnapshot.API, error),
-	preflight func(c *cobra.Command, f *fleet.Fleet, a fleet.App, stack string) error) *cobra.Command {
+	preflight func(c *cobra.Command, f *fleet.Fleet, a fleet.App, stack string) error, releaseEnv func(self, fleet string) []string) *cobra.Command {
 	var tag, repo, config, ref, script, selfcheck string
 	var with, withWeb, allowUnpushed []string
-	var noFetch, local, skipPublic, noSnapshot, noPreflight bool
+	var noFetch, local, skipPublic, noSnapshot, noPreflight, dryRun bool
 	cmd := &cobra.Command{
 		Use:   "ship <app> <stack> (--tag vX.Y.Z | --local [--with <repo>[@ref]]... [--with-web <repo>[@ref]]...)",
 		Short: "Package the app in a temporary worktree, deploy it, and check each host name",
@@ -47,7 +47,10 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath, format *string, newDe
 			"go.work. Each --with-web repository's npm packages that the app's front end uses are built and packed\n" +
 			"from its local commit with pnpm and installed in their place, in the temporary worktree only.\n" +
 			"The archive and the ledger name every upstream commit used. Every commit a local build\n" +
-			"uses must be on a remote branch, except --allow-unpushed repositories.",
+			"uses must be on a remote branch, except --allow-unpushed repositories.\n\n" +
+			"The release script must be executable in the commit packaged (git mode 100755); a shell script\n" +
+			"beside it that is not is reported. --dry-run packages and checks the release, then stops: nothing\n" +
+			"is snapshotted, deployed or recorded.",
 		Args: cobra.ExactArgs(2),
 		RunE: func(c *cobra.Command, args []string) (err error) {
 			app, stack := args[0], args[1]
@@ -141,10 +144,14 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath, format *string, newDe
 			if err := d.Hooks.Run(c.Context(), hooks.BeforePackage, facts); err != nil {
 				return err
 			}
+			var env []string
+			if releaseEnv != nil {
+				env = releaseEnv(self, fleetAbs)
+			}
 			p, err := ship.Build(c.Context(), ship.Options{
 				App: app, Repo: repo, Tag: tag, Deployforge: self, Fleet: fleetAbs, Script: script,
 				Fetch: !noFetch, Local: local, Ref: ref, Upstreams: ups, WebUpstreams: webUps,
-				RequirePushed: local, AllowUnpushed: allow, Log: c.ErrOrStderr(),
+				RequirePushed: local, AllowUnpushed: allow, Env: env, Log: c.ErrOrStderr(),
 			})
 			if err != nil {
 				facts.Error = err.Error()
@@ -162,6 +169,13 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath, format *string, newDe
 			facts.Revision = p.Commit
 			if err := d.Hooks.Run(c.Context(), hooks.AfterPackage, facts); err != nil {
 				return err
+			}
+			if dryRun {
+				st, err := os.Stat(p.Archive)
+				if err != nil {
+					return fmt.Errorf("ship: %w", err)
+				}
+				return say("dry run: packaged %s (%d bytes) from %s; nothing deployed", filepath.Base(p.Archive), st.Size(), p.Commit)
 			}
 			if d.Store, err = openStore(c); err != nil {
 				return err
@@ -227,6 +241,7 @@ func shipCmd(load func() (*fleet.Fleet, error), fleetPath, format *string, newDe
 	fl.BoolVar(&skipPublic, "skip-public-check", false, "do not check the host names from outside afterwards")
 	fl.BoolVar(&noSnapshot, "no-db-snapshot", false, "do not snapshot the database server before deploying the primary stack")
 	fl.BoolVar(&noPreflight, "no-preflight", false, "do not check the stack's secrets against the credential registry first")
+	fl.BoolVar(&dryRun, "dry-run", false, "package and check the release only; deploy nothing")
 	return cmd
 }
 

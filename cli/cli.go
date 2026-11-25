@@ -64,6 +64,10 @@ type Options struct {
 	// CredentialConnector reaches the credential stores for the check
 	// before a deploy; credforge's, through the targets, when nil.
 	CredentialConnector func(*targets.File) credforge.Connector
+	// ReleaseEnv gives an app's release script extra environment, as
+	// NAME=value, from this binary's path and the fleet document's: for
+	// scripts at older tags that read other names for them. None when nil.
+	ReleaseEnv func(self, fleet string) []string
 }
 
 // originOpener is the option's Origin CA, or Cloudflare's.
@@ -109,6 +113,12 @@ func New(o Options) *cobra.Command {
 		SilenceErrors: true,
 	}
 	root.PersistentFlags().StringVar(&fleetPath, "fleet", fleetPath, "the fleet document")
+	// --sites is the fleet document's older name, which release scripts at
+	// older tags still pass to release package.
+	root.PersistentFlags().StringVar(&fleetPath, "sites", fleetPath, "the fleet document; the older name of --fleet")
+	if err := root.PersistentFlags().MarkHidden("sites"); err != nil {
+		panic(err) // the flag was just defined
+	}
 	load := func() (*fleet.Fleet, error) { return fleet.Load(fleetPath) }
 	root.AddCommand(
 		validateCmd(load),
@@ -387,7 +397,7 @@ Environment:
 			return finish(c, format, &report.Report{Command: "rollback", App: args[0], Stack: args[1]}, e, err)
 		},
 	})
-	root.AddCommand(shipCmd(load, fleetPath, &format, newDeployer, openStore, lightsailOpener(o), preflightFor(o, fleetPath)))
+	root.AddCommand(shipCmd(load, fleetPath, &format, newDeployer, openStore, lightsailOpener(o), preflightFor(o, fleetPath), o.ReleaseEnv))
 	root.AddCommand(&cobra.Command{
 		Use:   "unlock <app> <stack>",
 		Short: "Remove the stack's deploy lock, left by a deploy that was cut off",
