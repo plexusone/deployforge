@@ -15,7 +15,7 @@ require (
 	github.com/invopop/jsonschema v0.14.0
 	github.com/plexusone/credforge v0.10.0
 	github.com/plexusone/systemspec-credential v0.4.0
-	github.com/plexusone/systemspec-runbook v0.2.0
+	github.com/plexusone/systemspec-runbook v0.4.1
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/mod v0.43.0
 	golang.org/x/net v0.63.0
