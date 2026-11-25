@@ -121,6 +121,7 @@ func New(o Options) *cobra.Command {
 	}
 	load := func() (*fleet.Fleet, error) { return fleet.Load(fleetPath) }
 	root.AddCommand(
+		cloudflareIPsCmd(),
 		validateCmd(load),
 		schemaCmd(),
 		nextPortCmd(load),
