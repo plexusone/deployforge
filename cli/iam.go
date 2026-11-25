@@ -58,16 +58,19 @@ func iamTargets(f *fleet.Fleet, args []string) ([]stackiam.Target, error) {
 
 func iamCmd(load func() (*fleet.Fleet, error), open func(*cobra.Command) (stackiam.Clients, error)) *cobra.Command {
 	var region, account, path string
+	var confirm bool
 	cmd := &cobra.Command{
-		Use:   "iam <plan|apply|verify> [<app> <stack>]...",
+		Use:   "iam <plan|apply|verify|policy> [<app> <stack>]...",
 		Short: "Give each app stack's parameter-store prefix its own IAM policy and operators' group",
 		Long: "iam makes, for each named stack or every live one, a policy ssm-<app>-<stack> that reads and writes\n" +
 			"the SSM parameters under the stack's secret prefix and lists parameter names, and a group\n" +
 			"<app>-<stack>-operators with the policy attached. Group members are reported, never changed.\n" +
-			"plan lists what is missing, apply creates it and checks again, verify fails unless all is in place.\n" +
+			"plan lists what is missing; apply creates it and checks again, and needs --confirm, as it changes\n" +
+			"the account's IAM: without it, apply shows the plan and stops. verify fails unless all is in place.\n" +
+			"policy prints one stack's policy document for review, with --account, and reads no AWS account.\n" +
 			"Nothing is deleted.",
 		Args:      cobra.MinimumNArgs(1),
-		ValidArgs: []string{"plan", "apply", "verify"},
+		ValidArgs: []string{"plan", "apply", "verify", "policy"},
 		RunE: func(c *cobra.Command, args []string) error {
 			f, err := load()
 			if err != nil {
@@ -80,17 +83,52 @@ func iamCmd(load func() (*fleet.Fleet, error), open func(*cobra.Command) (stacki
 			if region == "" {
 				return errors.New("iam: no region; pass --region or set AWS_REGION")
 			}
+			if args[0] == "policy" {
+				return printPolicy(c, targets, len(args[1:]), region, account)
+			}
+			mode := stackiam.Mode(args[0])
+			if mode == stackiam.Apply && !confirm {
+				mode = stackiam.Plan
+			}
 			clients, err := open(c)
 			if err != nil {
 				return err
 			}
-			_, err = stackiam.Run(c.Context(), clients, stackiam.Mode(args[0]), stackiam.Options{Region: region, ExpectAccount: account, Path: path}, targets, c.OutOrStdout())
-			return err
+			opts := stackiam.Options{Region: region, ExpectAccount: account, Path: path}
+			if _, err = stackiam.Run(c.Context(), clients, mode, opts, targets, c.OutOrStdout()); err != nil {
+				return err
+			}
+			if stackiam.Mode(args[0]) == stackiam.Apply && !confirm {
+				return errors.New("iam: apply changes the account's IAM; read the plan above, then run again with --confirm")
+			}
+			return nil
 		},
 	}
 	fl := cmd.Flags()
 	fl.StringVar(&region, "region", os.Getenv("AWS_REGION"), "the region of the parameters; default $AWS_REGION")
-	fl.StringVar(&account, "account", "", "refuse to act unless the AWS profile is this account")
+	fl.StringVar(&account, "account", "", "refuse to act unless the AWS profile is this account; with policy, the account the document names")
 	fl.StringVar(&path, "path", stackiam.DefaultPath, "the IAM path of the policies and groups")
+	fl.BoolVar(&confirm, "confirm", false, "with apply, make the changes the plan shows")
 	return cmd
+}
+
+// printPolicy prints the policy document of the one named stack, for
+// review before apply, without reading any AWS account.
+func printPolicy(c *cobra.Command, targets []stackiam.Target, named int, region, account string) error {
+	if named != 2 {
+		return errors.New("iam policy: name one stack, as <app> <stack>")
+	}
+	if account == "" {
+		return errors.New("iam policy: set --account to the 12-digit AWS account the document names")
+	}
+	p, err := stackiam.Document(targets[0], region, account)
+	if err != nil {
+		return err
+	}
+	text, err := p.JSON()
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintln(c.OutOrStdout(), text)
+	return err
 }
