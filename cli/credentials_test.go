@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/plexusone/credforge"
 	"github.com/plexusone/credforge/targets"
@@ -164,5 +165,60 @@ func TestPreflightNamesTheMissingSecret(t *testing.T) {
 	// Staging's prefix holds nothing the registry lists.
 	if err := check(cmd, f, a, "staging"); err != nil || !strings.Contains(out.String(), "0 secret(s) in place") {
 		t.Errorf("staging: %v\n%s", err, out.String())
+	}
+}
+
+// heldStore lists the session key under the prod prefix, and a name no
+// credential lists.
+type heldStore struct{}
+
+func (heldStore) Observe(_ context.Context, s credforge.Scope) ([]credforge.Observation, error) {
+	var out []credforge.Observation
+	for _, p := range []string{"/example/prod/example-app/SESSION_KEY", "/example/prod/example-app/STRAY"} {
+		k := credforge.Key{Type: s.Type, Account: s.Account, Path: p}
+		if s.Contains(k) {
+			out = append(out, credforge.Observation{Key: k, Modified: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)})
+		}
+	}
+	return out, nil
+}
+
+type heldConnector struct{}
+
+func (heldConnector) Observer(string, string) (credforge.Observer, error) { return heldStore{}, nil }
+func (heldConnector) References(string, string) (credforge.ReferenceFinder, error) {
+	return nil, nil
+}
+
+func TestCredentialsPreflight(t *testing.T) {
+	fleetPath := credentialFleet(t, map[string]string{"registry": "creds/credentials.json"})
+	runWith := func(connector credforge.Connector, args ...string) (string, error) {
+		cmd := New(Options{Fleet: fleetPath, CredentialConnector: func(*targets.File) credforge.Connector { return connector }})
+		var out bytes.Buffer
+		cmd.SetOut(&out)
+		cmd.SetErr(&out)
+		cmd.SetArgs(append([]string{"--fleet", fleetPath}, args...))
+		err := cmd.Execute()
+		return out.String(), err
+	}
+
+	out, err := runWith(emptyConnector{}, "credentials", "preflight", "example-app", "prod")
+	if err == nil || !strings.Contains(out, "missing   example-app/prod/SESSION_KEY") {
+		t.Errorf("missing: %v\n%s", err, out)
+	}
+
+	out, err = runWith(heldConnector{}, "credentials", "preflight", "example-app", "prod", "--require-recorded")
+	if err == nil || !strings.Contains(out, "present   unrecorded example-app/prod/SESSION_KEY (last changed 2026-01-02)") ||
+		!strings.Contains(out, "unlisted  /example/prod/example-app/STRAY") {
+		t.Errorf("unrecorded: %v\n%s", err, out)
+	}
+
+	out, err = runWith(heldConnector{}, "credentials", "preflight", "example-app", "prod", "--record", "--require-recorded")
+	if err != nil || !strings.Contains(out, "recorded 1 event(s)") {
+		t.Fatalf("record: %v\n%s", err, out)
+	}
+	out, err = runWith(heldConnector{}, "credentials", "preflight", "example-app", "prod", "--require-recorded")
+	if err != nil || !strings.Contains(out, "present   recorded   example-app/prod/SESSION_KEY") {
+		t.Errorf("after record: %v\n%s", err, out)
 	}
 }

@@ -147,7 +147,7 @@ func New(o Options) *cobra.Command {
 		releaseCmd(load),
 		deployCmd(load, &fleetPath, o),
 		ledgerCmd(load),
-		credentialsCmd(load, &fleetPath),
+		credentialsCmd(load, &fleetPath, o),
 		iamCmd(load, iamOpener(o)),
 		onHostCmd(),
 	)

@@ -75,3 +75,39 @@ func TestCheck(t *testing.T) {
 		t.Error("nothing missing is an error")
 	}
 }
+
+func TestInspect(t *testing.T) {
+	const prefix = "/example/prod/example-app/"
+	reg := credspec.NewRegistry(
+		secret("present", "hosting", prefix+"SESSION_KEY", credspec.StatusActive),
+		secret("missing", "hosting", prefix+"API_KEY", credspec.StatusActive),
+		secret("planned", "hosting", prefix+"LATER", credspec.StatusPlanned),
+	)
+	held := []string{prefix + "SESSION_KEY", prefix + "STRAY", prefix + "next/DB_DSN", prefix + "previous/DB_DSN"}
+	ch := &credforge.Checker{Connector: connector{ob: observer{held: held}}}
+
+	in, err := preflight.Inspect(context.Background(), ch, reg, credspec.NewLog(), prefix, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(in.Present) != 1 || in.Present[0].Credential != "present" || in.Present[0].Recorded {
+		t.Errorf("present %+v", in.Present)
+	}
+	if len(in.Missing) != 1 || in.Missing[0].Credential != "missing" {
+		t.Errorf("missing %+v", in.Missing)
+	}
+	if len(in.Unlisted) != 1 || in.Unlisted[0] != prefix+"STRAY" || in.Staged != 2 {
+		t.Errorf("unlisted %v, staged %d", in.Unlisted, in.Staged)
+	}
+	if len(in.Unrecorded()) != 1 {
+		t.Errorf("unrecorded %+v", in.Unrecorded())
+	}
+
+	in, err = preflight.Inspect(context.Background(), ch, reg, credspec.NewLog(), prefix, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(in.Missing) != 2 {
+		t.Errorf("with planned, missing %+v", in.Missing)
+	}
+}

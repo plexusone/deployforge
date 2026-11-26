@@ -85,7 +85,7 @@ func TargetsFor(f *fleet.Fleet, file string) (*targets.File, error) {
 // registry (validate, status, record, report and more), with credforge's
 // check, generate, install, review and setup beside them, and the page. The fleet document
 // names the files; a flag given on the command line wins.
-func credentialsCmd(load func() (*fleet.Fleet, error), fleetPath *string) *cobra.Command {
+func credentialsCmd(load func() (*fleet.Fleet, error), fleetPath *string, o Options) *cobra.Command {
 	files := func() (*fleet.Fleet, credentialFiles, error) {
 		f, err := load()
 		if err != nil {
@@ -125,7 +125,7 @@ func credentialsCmd(load func() (*fleet.Fleet, error), fleetPath *string) *cobra
 		},
 	}
 	cmd.AddCommand(forgecli.Check(forge), forgecli.Generate(forge), forgecli.Install(forge), forgecli.Review(forge), forgecli.Setup(forge),
-		credentialsPageCmd(files, tool))
+		credentialsPageCmd(files, tool), credentialsPreflightCmd(files, o))
 	// The flags' defaults come from the fleet document, which is read once
 	// the command line, with --fleet, is parsed.
 	cmd.PersistentPreRunE = func(c *cobra.Command, _ []string) error {
@@ -148,14 +148,131 @@ func credentialsCmd(load func() (*fleet.Fleet, error), fleetPath *string) *cobra
 	return cmd
 }
 
+// connectorFor is the option's credential connector, or credforge's.
+func connectorFor(o Options) func(*targets.File) credforge.Connector {
+	if o.CredentialConnector != nil {
+		return o.CredentialConnector
+	}
+	return func(t *targets.File) credforge.Connector { return forgecli.NewConnector(t) }
+}
+
+// credentialsPreflightCmd compares a stack's secret prefix with the
+// registry, as a deploy's check does, and shows all of it: what is present
+// and whether the log records it, what is missing, and names no credential
+// lists. With --record it records the present ones as created.
+func credentialsPreflightCmd(files func() (*fleet.Fleet, credentialFiles, error), o Options) *cobra.Command {
+	var record, includePlanned, requireRecorded bool
+	cmd := &cobra.Command{
+		Use:   "preflight <app> <stack>",
+		Short: "Compare a stack's secret prefix with the registry: present, missing and unlisted; names and dates only",
+		Long: "preflight lists the stack's secret prefix and compares it with every active credential the registry stores\n" +
+			"there, as the check before a deploy does, reading no value. It shows each credential present, with when\n" +
+			"its store last set it and whether the event log records it, each missing, and each name under the\n" +
+			"prefix no credential names; a database move's values under next/ and previous/ are counted, not listed.\n" +
+			"A credential that is optional, or needed only while another rotates, is never missing. --include-planned\n" +
+			"also compares planned credentials, such as those of a stack not yet deployed. --record records each\n" +
+			"present credential the log lacks as created, at its store's time. It exits non-zero when a credential\n" +
+			"is missing, and with --require-recorded when one present is unrecorded.",
+		Args: cobra.ExactArgs(2),
+		RunE: func(c *cobra.Command, args []string) error {
+			f, cf, err := files()
+			if err != nil {
+				return err
+			}
+			a, _, err := f.Stack(args[0], args[1])
+			if err != nil {
+				return err
+			}
+			reg, err := credspec.LoadRegistry(cf.registry)
+			if err != nil {
+				return err
+			}
+			log, err := credspec.LoadLog(cf.events, reg)
+			if err != nil {
+				return err
+			}
+			tf, err := TargetsFor(f, cf.targets)
+			if err != nil {
+				return err
+			}
+			prefix := a.SecretPrefixFor(args[1])
+			in, err := preflight.Inspect(c.Context(), &credforge.Checker{Connector: connectorFor(o)(tf)}, reg, log, prefix, includePlanned)
+			if err != nil {
+				return err
+			}
+			out := c.OutOrStdout()
+			p := func(format string, args ...any) error { _, err := fmt.Fprintf(out, format, args...); return err }
+			if err := p("%s: %d credential(s) present, %d missing, %d name(s) unlisted\n", prefix, len(in.Present), len(in.Missing), len(in.Unlisted)); err != nil {
+				return err
+			}
+			for _, fd := range in.Present {
+				state := "recorded"
+				if !fd.Recorded {
+					state = "unrecorded"
+				}
+				if err := p("  present   %-10s %s (last changed %s)\n", state, fd.Credential, fd.Modified.UTC().Format("2006-01-02")); err != nil {
+					return err
+				}
+			}
+			for _, m := range in.Missing {
+				if err := p("  missing   %s (%s)\n", m.Credential, m.Parameter); err != nil {
+					return err
+				}
+			}
+			for _, n := range in.Unlisted {
+				if err := p("  unlisted  %s\n", n); err != nil {
+					return err
+				}
+			}
+			if in.Staged > 0 {
+				if err := p("  unlisted  %d under next/ and previous/, from a database move\n", in.Staged); err != nil {
+					return err
+				}
+			}
+			for _, n := range in.Unobserved {
+				if err := p("  unobserved %s: no binding reaches it\n", n); err != nil {
+					return err
+				}
+			}
+			unrecorded := in.Unrecorded()
+			if record && len(unrecorded) > 0 {
+				events, err := credforge.Record(reg, log, in.Report, credforge.DefaultGrace)
+				if err != nil {
+					return err
+				}
+				if err := log.Save(cf.events); err != nil {
+					return err
+				}
+				if err := p("recorded %d event(s) in %s\n", len(events), cf.events); err != nil {
+					return err
+				}
+				unrecorded = nil
+			}
+			var errs []error
+			if len(in.Missing) > 0 {
+				errs = append(errs, fmt.Errorf("%d credential(s) missing", len(in.Missing)))
+			}
+			if requireRecorded && len(unrecorded) > 0 {
+				errs = append(errs, fmt.Errorf("%d credential(s) present and unrecorded; run with --record", len(unrecorded)))
+			}
+			if err := errors.Join(errs...); err != nil {
+				return fmt.Errorf("credentials preflight: %w", err)
+			}
+			return nil
+		},
+	}
+	fl := cmd.Flags()
+	fl.BoolVar(&record, "record", false, "record each present credential the event log lacks as created, at its store's time")
+	fl.BoolVar(&includePlanned, "include-planned", false, "compare planned credentials too, such as a stack's not yet deployed")
+	fl.BoolVar(&requireRecorded, "require-recorded", false, "exit non-zero when a present credential is unrecorded")
+	return cmd
+}
+
 // preflightFor checks a stack's secrets against the fleet's credential
 // registry before a deploy, naming the missing ones. A parameter no binding
 // reaches is reported and does not stop it.
 func preflightFor(o Options, fleetPath *string) func(c *cobra.Command, f *fleet.Fleet, a fleet.App, stack string) error {
-	connect := o.CredentialConnector
-	if connect == nil {
-		connect = func(t *targets.File) credforge.Connector { return forgecli.NewConnector(t) }
-	}
+	connect := connectorFor(o)
 	return func(c *cobra.Command, f *fleet.Fleet, a fleet.App, stack string) error {
 		cf, err := filesOf(f, *fleetPath)
 		if err != nil {
