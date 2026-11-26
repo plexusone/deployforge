@@ -275,6 +275,10 @@
         "sshUser": {
           "type": "string",
           "description": "The user to connect as over SSH, with sudo; ubuntu when empty"
+        },
+        "lightsailName": {
+          "type": "string",
+          "description": "The host's name as a Lightsail instance, for host ports to read its firewall"
         }
       },
       "additionalProperties": false,

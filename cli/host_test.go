@@ -7,17 +7,23 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/service/lightsail"
+	lstypes "github.com/aws/aws-sdk-go-v2/service/lightsail/types"
 	"github.com/spf13/cobra"
 
 	"github.com/plexusone/deployforge/dbroles"
+	"github.com/plexusone/deployforge/deploy/cfranges"
 	"github.com/plexusone/deployforge/deploy/deployer"
 	"github.com/plexusone/deployforge/fleet"
+	"github.com/plexusone/deployforge/hostports"
 	"github.com/plexusone/deployforge/origincert"
 )
 
@@ -236,5 +242,65 @@ func TestOriginCertInstallMakesTheKeyOnTheHost(t *testing.T) {
 	}
 	if _, err := run(t, "origin-cert", "install", "Example.com;", "web-1"); err == nil {
 		t.Error("a zone that is not a zone name")
+	}
+}
+
+type portsFake struct{ states []lstypes.InstancePortState }
+
+func (p portsFake) GetInstancePortStates(context.Context, *lightsail.GetInstancePortStatesInput, ...func(*lightsail.Options)) (*lightsail.GetInstancePortStatesOutput, error) {
+	return &lightsail.GetInstancePortStatesOutput{PortStates: p.states}, nil
+}
+
+func TestHostPorts(t *testing.T) {
+	data, err := os.ReadFile(testFleet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatal(err)
+	}
+	doc["hosts"].([]any)[0].(map[string]any)["lightsailName"] = "web-1-instance"
+	out, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "fleet.json")
+	if err := os.WriteFile(path, out, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ranges, err := cfranges.Ranges()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var edge []string
+	for _, p := range ranges {
+		if p.Addr().Is4() {
+			edge = append(edge, p.String())
+		}
+	}
+	open := func(states ...lstypes.InstancePortState) func(*cobra.Command) (hostports.API, error) {
+		return func(*cobra.Command) (hostports.API, error) { return portsFake{states: states}, nil }
+	}
+	tcp := func(n int32, cidrs ...string) lstypes.InstancePortState {
+		return lstypes.InstancePortState{FromPort: n, ToPort: n, Protocol: lstypes.NetworkProtocolTcp, State: lstypes.PortStateOpen, Cidrs: cidrs}
+	}
+	host := func(api func(*cobra.Command) (hostports.API, error), args ...string) (string, error) {
+		cmd := New(Options{Fleet: path, HostPorts: api})
+		var b bytes.Buffer
+		cmd.SetOut(&b)
+		cmd.SetErr(&b)
+		cmd.SetArgs(append([]string{"host", "ports"}, args...))
+		err := cmd.Execute()
+		return b.String(), err
+	}
+	if out, err := host(open(tcp(443, edge...), tcp(22, "192.0.2.10/32")), "web-1", "--admin-cidr", "192.0.2.10/32"); err != nil {
+		t.Errorf("a firewall as wanted: %v\n%s", err, out)
+	}
+	if out, err := host(open(tcp(22, "192.0.2.10/32")), "web-1", "--admin-cidr", "192.0.2.10/32"); err == nil || !strings.Contains(out, "tcp 443 is closed") {
+		t.Errorf("443 closed: %v\n%s", err, out)
+	}
+	if _, err := host(open(), "web-1"); err == nil {
+		t.Error("no --admin-cidr was accepted")
 	}
 }

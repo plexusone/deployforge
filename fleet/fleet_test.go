@@ -315,3 +315,15 @@ func TestCloudflareHostsAreOneLabelUnderTheZone(t *testing.T) {
 		}
 	}
 }
+
+func TestHostLightsailName(t *testing.T) {
+	f := load(t)
+	f.Hosts[0].LightsailName = "Web-1"
+	if err := f.Validate(); err != nil {
+		t.Errorf("a valid Lightsail name: %v", err)
+	}
+	f.Hosts[0].LightsailName = "web 1"
+	if err := f.Validate(); err == nil || !strings.Contains(err.Error(), "lightsailName") {
+		t.Errorf("an invalid Lightsail name: %v", err)
+	}
+}

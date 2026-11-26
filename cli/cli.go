@@ -31,6 +31,7 @@ import (
 	"github.com/plexusone/deployforge/deploy/systemd"
 	"github.com/plexusone/deployforge/deploy/unpushed"
 	"github.com/plexusone/deployforge/fleet"
+	"github.com/plexusone/deployforge/hostports"
 	"github.com/plexusone/deployforge/ledger"
 	"github.com/plexusone/deployforge/origincert"
 	"github.com/plexusone/deployforge/provenance"
@@ -75,6 +76,9 @@ type Options struct {
 	// are known, such as an ID looked up in the target database. None when
 	// nil.
 	ImportHook func(cmd *cobra.Command) ImportReplacer
+	// HostPorts opens the client host ports reads a firewall with;
+	// Lightsail with the default AWS configuration when nil.
+	HostPorts func(c *cobra.Command) (hostports.API, error)
 }
 
 // ImportReplacer returns replacements for db import from the database it
@@ -97,6 +101,25 @@ func iamOpener(o Options) func(c *cobra.Command) (stackiam.Clients, error) {
 		return o.IAM
 	}
 	return func(c *cobra.Command) (stackiam.Clients, error) { return iamClients(c.Context()) }
+}
+
+// hostPortsOpener is the option's opener, or Lightsail with the default
+// AWS configuration.
+func hostPortsOpener(o Options) func(c *cobra.Command) (hostports.API, error) {
+	if o.HostPorts != nil {
+		return o.HostPorts
+	}
+	return func(c *cobra.Command) (hostports.API, error) {
+		api, err := lightsailAPI(c.Context())
+		if err != nil {
+			return nil, err
+		}
+		ports, ok := api.(hostports.API)
+		if !ok {
+			return nil, errors.New("host ports: the Lightsail client cannot read port states")
+		}
+		return ports, nil
+	}
 }
 
 // lightsailOpener is the option's opener, or Lightsail with the default
@@ -138,7 +161,7 @@ func New(o Options) *cobra.Command {
 		schemaCmd(),
 		nextPortCmd(load),
 		unitCmd(load),
-		hostCmd(load, dialer(o)),
+		hostCmd(load, dialer(o), hostPortsOpener(o)),
 		caddyfileCmd(load),
 		caddyCmd(load, dialer(o)),
 		dbCmd(load, o),

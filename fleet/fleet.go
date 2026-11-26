@@ -94,6 +94,9 @@ type Host struct {
 	AddressFrom *AddressSource `json:"addressFrom,omitempty" jsonschema:"description=Where to read the host's address when it is used\\, such as a Pulumi stack output"`
 	// SSHUser is the user deployforge connects as; it needs sudo.
 	SSHUser string `json:"sshUser,omitempty" jsonschema:"description=The user to connect as over SSH\\, with sudo; ubuntu when empty"`
+	// LightsailName is the host's name as a Lightsail instance, for host
+	// ports to read its firewall.
+	LightsailName string `json:"lightsailName,omitempty" jsonschema:"description=The host's name as a Lightsail instance\\, for host ports to read its firewall"`
 }
 
 // AddressSource names where a host's address is read from.
@@ -443,6 +446,9 @@ func (f *Fleet) Validate() error {
 			bad(at, "name is used by another host")
 		}
 		hostNames[h.Name] = true
+		if h.LightsailName != "" && !namePattern.MatchString(strings.ToLower(h.LightsailName)) {
+			bad(at, "lightsailName %q must be letters, digits and hyphens", h.LightsailName)
+		}
 		switch {
 		case h.AddressFrom == nil && strings.TrimSpace(h.Address) == "":
 			bad(at, "needs an address or addressFrom")
