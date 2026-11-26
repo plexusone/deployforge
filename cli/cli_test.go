@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -183,4 +184,19 @@ func runIn(t *testing.T, o Options, args ...string) (string, error) {
 	cmd.SetArgs(args)
 	err := cmd.Execute()
 	return out.String(), err
+}
+
+func TestFleetPages(t *testing.T) {
+	out, err := run(t, "fleet", "inventory")
+	if err != nil || !strings.Contains(out, "# Fleet Inventory") || !strings.Contains(out, "by `deployforge fleet inventory`") {
+		t.Errorf("inventory: %v\n%s", err, out)
+	}
+	path := filepath.Join(t.TempDir(), "format.md")
+	if _, err := run(t, "fleet", "format", "-o", path); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path) //nolint:gosec // G304: the test's own file
+	if err != nil || !strings.Contains(string(data), "# Fleet Document Format") {
+		t.Errorf("format: %v", err)
+	}
 }

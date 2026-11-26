@@ -165,6 +165,7 @@ func New(o Options) *cobra.Command {
 	root.AddCommand(
 		cloudflareIPsCmd(),
 		validateCmd(load),
+		fleetCmd(load, &fleetPath),
 		schemaCmd(),
 		nextPortCmd(load),
 		unitCmd(load),
