@@ -9,6 +9,85 @@
   ],
   "releases": [
     {
+      "version": "v0.2.0",
+      "date": "2026-11-25",
+      "highlights": [
+        {
+          "description": "deploy ship refuses a release script that is not executable in the commit it packages, and --dry-run packages and checks a release without deploying it"
+        },
+        {
+          "description": "A failed deploy names the step it stopped at, and ship, release, rollback and status can write one JSON report"
+        },
+        {
+          "description": "iam apply needs --confirm, and iam policy prints a stack's policy for review"
+        }
+      ],
+      "added": [
+        {
+          "description": "A failed release or rollback carries the step it stopped at (unpack, install, validate, the self-check's stages, migrate, switch or health), whether the running release was kept or restored, and whether the migration stays applied",
+          "commit": "adfd039"
+        },
+        {
+          "description": "--format json on deploy ship, release, rollback and status: one JSON report on standard output with the phase that failed, the host's failure, the ledger entry and ship's snapshot; progress goes to standard error",
+          "commit": "459f52f"
+        },
+        {
+          "description": "deploy ship checks, in the commit it packages, that the release script is executable (git mode 100755) and stops with the git update-index --chmod=+x fix when it is not; a shell script beside it that is not executable is reported as a warning",
+          "commit": "ee4c7d6"
+        },
+        {
+          "description": "deploy ship --dry-run packages and checks the release, then stops: nothing is snapshotted, deployed or recorded",
+          "commit": "d91e2a4"
+        },
+        {
+          "description": "cli.Options.ReleaseEnv and ship.Options.Env give release scripts extra environment, for scripts at older tags that read other names; release package accepts --sites as an older name of --fleet",
+          "commit": "d91e2a4"
+        },
+        {
+          "description": "iam policy prints one stack's policy document for review, with --account, reading no AWS account",
+          "commit": "6c96988"
+        },
+        {
+          "description": "cloudflare-ips refreshes the committed Cloudflare ranges from the published lists, and --check fails when this build's ranges are out of date",
+          "commit": "8f4d9c0"
+        }
+      ],
+      "changed": [
+        {
+          "description": "iam apply needs --confirm: without it, it shows the plan, changes nothing and says to run again with --confirm",
+          "commit": "6c96988"
+        },
+        {
+          "description": "For an app behind cloudflare, validate refuses a host name more than one label under its domain, which the zone's certificates do not cover",
+          "commit": "bb8fa9a"
+        }
+      ],
+      "dependencies": [
+        {
+          "description": "Requires systemspec-runbook v0.4.1",
+          "commit": "1a3dca4"
+        },
+        {
+          "description": "Requires credforge v0.11.1, so the deploy preflight never counts a credential needed only during a rotation as missing",
+          "commit": "ab2a960"
+        },
+        {
+          "description": "Indirect dependency updates",
+          "commit": "65430fc"
+        }
+      ],
+      "documentation": [
+        {
+          "description": "Migrations a rollback survives, and the JSON reports",
+          "commit": "7a42a72"
+        },
+        {
+          "description": "The release script check, dry runs, iam policy and --confirm, cloudflare-ips, ReleaseEnv and the one-label host rule",
+          "commit": "4299a52"
+        }
+      ]
+    },
+    {
       "version": "v0.1.0",
       "date": "2026-11-23",
       "highlights": [
