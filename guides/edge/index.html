@@ -592,6 +592,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#cloudflares-ranges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cloudflare's ranges
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1009,6 +1020,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../releases/v0.2.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.2.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../releases/v0.1.0/" class="md-nav__link">
         
   
@@ -1129,6 +1168,17 @@
     <span class="md-ellipsis">
       
         Origin certificates
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cloudflares-ranges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cloudflare's ranges
       
     </span>
   </a>
@@ -1261,6 +1311,15 @@
 <p>An example of <code>issue</code> with a CSR you made elsewhere:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>deployforge<span class="w"> </span>origin-cert<span class="w"> </span>issue<span class="w"> </span>example.com<span class="w"> </span>--days<span class="w"> </span><span class="m">365</span><span class="w"> </span>-o<span class="w"> </span>example.com.pem<span class="w"> </span>&lt;<span class="w"> </span>example.com.csr
 </code></pre></div>
+<h2 id="cloudflares-ranges">Cloudflare's ranges<a class="headerlink" href="#cloudflares-ranges" title="Permanent link">&para;</a></h2>
+<p>Caddy and the host's firewall trust Cloudflare's proxy ranges, which deployforge carries in <code>deploy/cfranges/ips-v4.txt</code> and <code>ips-v6.txt</code>. Cloudflare changes them rarely.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>deployforge<span class="w"> </span>cloudflare-ips<span class="w"> </span>--check
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>deployforge<span class="w"> </span>cloudflare-ips<span class="w"> </span>--dir<span class="w"> </span>deploy/cfranges
+</code></pre></div>
+<ul>
+<li><code>cloudflare-ips --check</code> compares the ranges this build carries with the lists Cloudflare publishes, and fails when Cloudflare has added or removed one. Run it in a scheduled job.</li>
+<li><code>cloudflare-ips</code> writes the published lists to <code>--dir</code> (default <code>deploy/cfranges</code>), for review and a release of deployforge.</li>
+</ul>
 
 
 

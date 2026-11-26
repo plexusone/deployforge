@@ -1025,6 +1025,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../releases/v0.2.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.2.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../releases/v0.1.0/" class="md-nav__link">
         
   
@@ -1289,7 +1317,7 @@
 </tr>
 <tr>
 <td><code>edge</code></td>
-<td><code>cloudflare</code>, or empty for none. With <code>cloudflare</code>, Caddy serves the zone's origin certificate and trusts Cloudflare's addresses to name the client. With none, Caddy gets its own certificates. An app behind <code>cloudflare</code> needs <code>domain</code>.</td>
+<td><code>cloudflare</code>, or empty for none. With <code>cloudflare</code>, Caddy serves the zone's origin certificate and trusts Cloudflare's addresses to name the client. With none, Caddy gets its own certificates. An app behind <code>cloudflare</code> needs <code>domain</code>, and each of its host names must be the domain or one label under it, such as <code>app.example.com</code>: the zone's certificates cover only the zone and <code>*.zone</code>.</td>
 </tr>
 <tr>
 <td><code>secretPrefix</code></td>
