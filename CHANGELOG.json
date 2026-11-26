@@ -9,6 +9,31 @@
   ],
   "releases": [
     {
+      "version": "v0.3.2",
+      "date": "2026-11-26",
+      "highlights": [
+        {
+          "description": "Each stack's deploy runbook checks that the stack's systemd unit on its host is the fleet document's before it ships, so a change to its limits is installed first"
+        }
+      ],
+      "added": [
+        {
+          "description": "host setup --check compares the stack's unit installed on its host with the fleet document's, comments and blank lines aside, and fails with the first difference and the fix; it changes nothing",
+          "commit": "536d88a"
+        },
+        {
+          "description": "The deploy runbook's first step runs host setup --check, and the runbook's troubleshooting names host setup --apply when the unit is out of date or missing",
+          "commit": "b4e2060"
+        }
+      ],
+      "documentation": [
+        {
+          "description": "The hosts and deploying guides describe host setup --check",
+          "commit": "c237f84"
+        }
+      ]
+    },
+    {
       "version": "v0.3.1",
       "date": "2026-11-26",
       "highlights": [
