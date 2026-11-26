@@ -82,4 +82,4 @@ deployforge host ports web-1 --admin-cidr 192.0.2.10/32 --admin-cidr 198.51.100.
 - SSH (22) is open only to the `--admin-cidr` addresses;
 - no other port is open.
 
-It reports each range missing or extra, and changes nothing. Run it after any change to the firewall. Lightsail replaces an instance's rules as a whole, and a tool that replaces them new-first, then deletes the old set, can close the ports it just opened: every site behind the host then times out while the host itself is healthy.
+It reports each range missing or extra, and changes nothing. A tool embedding deployforge can give the admin addresses once, with `Options.AdminCIDRs`, so `host ports <host>` needs no flags. Run it after any change to the firewall; each stack's deploy runbook also runs it before a ship (see [Deploying](deploying.md)). Lightsail replaces an instance's rules as a whole, and a tool that replaces them new-first, then deletes the old set, can close the ports it just opened: every site behind the host then times out while the host itself is healthy.

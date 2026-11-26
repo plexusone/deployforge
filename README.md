@@ -155,6 +155,18 @@ only with deployforge.
 
 The site is built with MkDocs: `mkdocs serve` from the repository root.
 
+## Development
+
+```sh
+make test     # go test ./...
+make lint     # golangci-lint with the organization's shared configuration, as CI runs it
+```
+
+`make lint` reads the shared configuration from a checkout of the
+organization's `.github` repository beside this one; set
+`LINT_CONFIG_REPO` to point elsewhere. It enables the gofmt and goimports
+formatters, which a plain `golangci-lint run` without it does not.
+
 ## License
 
 MIT

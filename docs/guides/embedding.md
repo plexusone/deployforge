@@ -109,6 +109,7 @@ Every field is optional. A nil function uses the default, which is the real serv
 | `ReleaseEnv` | Extra environment for an app's release script, as `NAME=value`, from the running binary's path and the fleet document's. For scripts at older tags that read other names for them. None when nil. |
 | `ImportHook` | Adds a host tool's own flags and replacements to `db import`, such as an ID it looks up in the target database once the owner's connection and the host are known. None when nil. |
 | `HostPorts` | Opens the client `host ports` reads a firewall with. Lightsail with the default AWS configuration when nil. |
+| `AdminCIDRs` | The addresses SSH should be open to: `host ports`' default for `--admin-cidr`, and the firewall check in each stack's deploy runbook. None when empty. |
 | `RunbookTool` | How a deploy runbook's commands run the tool, such as a host tool's binary and its fleet flag. This program with `--fleet` when empty. |
 | `RunbookDir` | Where each stack's deploy runbook event log is kept. `deployments/runbooks` when empty. |
 
@@ -125,6 +126,7 @@ CredentialConnector func(*targets.File) credforge.Connector
 ReleaseEnv          func(self, fleet string) []string
 ImportHook          func(cmd *cobra.Command) cli.ImportReplacer
 HostPorts           func(c *cobra.Command) (hostports.API, error)
+AdminCIDRs          []string
 RunbookTool         []string
 RunbookDir          string
 ```
