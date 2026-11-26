@@ -31,7 +31,7 @@ func deployRunbookCmd(load func() (*fleet.Fleet, error), fleetPath *string, o Op
 			tool = []string{program(), "--fleet", *fleetPath}
 		}
 		runbook := strings.Join(append(append([]string{}, tool...), "deploy", "runbook", "--app", app, "--stack", stack), " ")
-		return deployrunbook.Options{Tool: tool, RunbookCommand: runbook}
+		return deployrunbook.Options{Tool: tool, RunbookCommand: runbook, AdminCIDRs: o.AdminCIDRs}
 	}
 	build := func() (*runbookspec.Runbook, error) {
 		f, err := load()

@@ -79,6 +79,10 @@ type Options struct {
 	// HostPorts opens the client host ports reads a firewall with;
 	// Lightsail with the default AWS configuration when nil.
 	HostPorts func(c *cobra.Command) (hostports.API, error)
+	// AdminCIDRs are the addresses SSH should be open to on every host:
+	// host ports checks them when --admin-cidr is not given, and each
+	// stack's deploy runbook checks the host's firewall before it ships.
+	AdminCIDRs []string
 	// RunbookTool is how a deploy runbook's commands run this tool, such
 	// as a host tool's binary and its fleet flag; this program with
 	// --fleet when empty.
@@ -169,7 +173,7 @@ func New(o Options) *cobra.Command {
 		schemaCmd(),
 		nextPortCmd(load),
 		unitCmd(load),
-		hostCmd(load, dialer(o), hostPortsOpener(o)),
+		hostCmd(load, dialer(o), hostPortsOpener(o), o.AdminCIDRs),
 		caddyfileCmd(load),
 		caddyCmd(load, dialer(o)),
 		dbCmd(load, o),

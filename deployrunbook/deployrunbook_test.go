@@ -70,3 +70,44 @@ func TestBuildRefusesAStackNotLive(t *testing.T) {
 		t.Errorf("EventsPath %s", got)
 	}
 }
+
+// TestBuildChecksTheFirewall checks that, given admin addresses and a host
+// whose Lightsail name the fleet gives, the operator's shell step checks
+// the host's firewall before anything ships, and that without either it
+// does not.
+func TestBuildChecksTheFirewall(t *testing.T) {
+	f := load(t)
+	app, _ := f.App("example-app")
+	host := app.Stacks["prod"].Host
+	for i := range f.Hosts {
+		if f.Hosts[i].Name == host {
+			f.Hosts[i].LightsailName = host
+		}
+	}
+	o := deployrunbook.Options{AdminCIDRs: []string{"192.0.2.10/32", "198.51.100.7/32"}}
+	book, err := deployrunbook.Build(f, "example-app", "prod", o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shell := book.Steps()[0]
+	var got string
+	for _, c := range shell.Checks {
+		if c.ID == "firewall" {
+			got = strings.Join(c.Command.Args, " ")
+		}
+	}
+	want := "deployforge host ports " + host + " --admin-cidr 192.0.2.10/32 --admin-cidr 198.51.100.7/32"
+	if got != want {
+		t.Errorf("firewall check %q, want %q", got, want)
+	}
+
+	book, err = deployrunbook.Build(f, "example-app", "prod", deployrunbook.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range book.Steps()[0].Checks {
+		if c.ID == "firewall" {
+			t.Error("a firewall check without admin addresses")
+		}
+	}
+}

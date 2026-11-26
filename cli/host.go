@@ -18,7 +18,7 @@ import (
 	"github.com/plexusone/deployforge/hostports"
 )
 
-func hostCmd(load func() (*fleet.Fleet, error), dial func(key string) deployer.Dialer, ports func(c *cobra.Command) (hostports.API, error)) *cobra.Command {
+func hostCmd(load func() (*fleet.Fleet, error), dial func(key string) deployer.Dialer, ports func(c *cobra.Command) (hostports.API, error), adminCIDRs []string) *cobra.Command {
 	root := &cobra.Command{
 		Use:   "host",
 		Short: "Prepare an app stack's place on its host, and check a host's firewall",
@@ -97,12 +97,12 @@ func hostCmd(load func() (*fleet.Fleet, error), dial func(key string) deployer.D
 	}
 	setup.Flags().BoolVar(&apply, "apply", false, "run the script on the stack's host over SSH, with sudo")
 	setup.Flags().StringVar(&sshKey, "ssh-key", cmp.Or(os.Getenv(EnvSSHKey), ""), "the host's SSH private key, used through the agent SSH_AUTH_SOCK names")
-	root.AddCommand(setup, hostPortsCmd(load, ports))
+	root.AddCommand(setup, hostPortsCmd(load, ports, adminCIDRs))
 	return root
 }
 
 // hostPortsCmd checks a host's Lightsail firewall (package hostports).
-func hostPortsCmd(load func() (*fleet.Fleet, error), open func(c *cobra.Command) (hostports.API, error)) *cobra.Command {
+func hostPortsCmd(load func() (*fleet.Fleet, error), open func(c *cobra.Command) (hostports.API, error), adminCIDRs []string) *cobra.Command {
 	var admin []string
 	var ipv6 bool
 	cmd := &cobra.Command{
@@ -172,7 +172,7 @@ func hostPortsCmd(load func() (*fleet.Fleet, error), open func(c *cobra.Command)
 			return nil
 		},
 	}
-	cmd.Flags().StringArrayVar(&admin, "admin-cidr", nil, "an address SSH should be open to, as a CIDR such as 192.0.2.10/32; repeat for each")
+	cmd.Flags().StringArrayVar(&admin, "admin-cidr", adminCIDRs, "an address SSH should be open to, as a CIDR such as 192.0.2.10/32; repeat for each; the tool's admin addresses when not given")
 	cmd.Flags().BoolVar(&ipv6, "ipv6", false, "expect HTTPS open to Cloudflare's IPv6 ranges too")
 	return cmd
 }

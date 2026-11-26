@@ -41,6 +41,11 @@ type Options struct {
 	// SetupHowTo is the operator's shell setup, as Markdown, such as which
 	// file sets the AWS profile and the SSH key's path.
 	SetupHowTo string
+	// AdminCIDRs are the addresses SSH should be open to. With them, and a
+	// host whose lightsailName the fleet document gives, the operator's
+	// shell step also checks the host's firewall, so a firewall change that
+	// closed HTTPS is found before a ship, not after it.
+	AdminCIDRs []string
 }
 
 // EventsPath is the stack's deploy runbook event log under dir.
@@ -61,7 +66,11 @@ func Build(f *fleet.Fleet, app, stack string, o Options) (*rb.Runbook, error) {
 	if s.Status != fleet.Live {
 		return nil, fmt.Errorf("deployrunbook: %s's %s stack is %s; a deploy runbook is for a live stack", app, stack, s.Status)
 	}
-	book := build(a, s, stack, f.Credentials != nil, o)
+	firewall := ""
+	if h, ok := f.Host(s.Host); ok && h.LightsailName != "" && len(o.AdminCIDRs) > 0 {
+		firewall = h.Name
+	}
+	book := build(a, s, stack, f.Credentials != nil, firewall, o)
 	if err := book.Validate(rb.ValidateOptions{KnownCredential: func(string) bool { return false }, KnownNamedCheck: func(string) bool { return false }}); err != nil {
 		return nil, err
 	}
@@ -86,7 +95,7 @@ func Export(book *rb.Runbook) ([]byte, error) {
 	return append(out, '\n'), nil
 }
 
-func build(a fleet.App, s fleet.Stack, stack string, credentials bool, o Options) *rb.Runbook {
+func build(a fleet.App, s fleet.Stack, stack string, credentials bool, firewall string, o Options) *rb.Runbook {
 	tool := o.Tool
 	if len(tool) == 0 {
 		tool = []string{"deployforge"}
@@ -137,6 +146,15 @@ func build(a fleet.App, s fleet.Stack, stack string, credentials bool, o Options
 				Command: &rb.CommandCheck{Args: []string{"aws", "sts", "get-caller-identity", "--query", "Arn", "--output", "text"}, Contains: "arn:aws:"}},
 		},
 	}}
+	if firewall != "" {
+		args := run("host", "ports", firewall)
+		for _, c := range o.AdminCIDRs {
+			args = append(args, "--admin-cidr", c)
+		}
+		prepare[0].Checks = append(prepare[0].Checks, rb.Check{ID: "firewall",
+			Description: firewall + "'s firewall admits HTTPS from the edge and SSH only from the admin addresses",
+			Kind:        rb.KindCommand, Command: &rb.CommandCheck{Args: args}})
+	}
 	if credentials {
 		prepare = append(prepare, rb.Step{
 			ID: "1.2", Title: "The stack's secrets", Owner: rb.OwnerAgent,
