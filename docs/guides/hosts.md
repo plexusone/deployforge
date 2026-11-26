@@ -69,3 +69,17 @@ A host can take its address from a Pulumi stack output, so the fleet document ho
 ```
 
 Every command that reaches the host resolves the address when it needs it, by running `pulumi stack output` in `dir`. `pulumi` must be installed and logged in. The same form, `endpointFrom`, works for the database server's endpoint. The database administrator's password can come from a Pulumi secret with `adminPassword.pulumiConfig`. See [Databases](databases.md).
+
+## Check a host's firewall
+
+```bash
+deployforge host ports web-1 --admin-cidr 192.0.2.10/32 --admin-cidr 198.51.100.7/32
+```
+
+`host ports <host>` reads the Lightsail instance's port states, the host's `lightsailName` in the fleet document, and exits non-zero unless:
+
+- HTTPS (443) is open exactly to Cloudflare's IPv4 ranges, and with `--ipv6` its IPv6 ranges too;
+- SSH (22) is open only to the `--admin-cidr` addresses;
+- no other port is open.
+
+It reports each range missing or extra, and changes nothing. Run it after any change to the firewall. Lightsail replaces an instance's rules as a whole, and a tool that replaces them new-first, then deletes the old set, can close the ports it just opened: every site behind the host then times out while the host itself is healthy.

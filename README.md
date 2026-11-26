@@ -48,6 +48,12 @@ Your repository keeps the configuration; deployforge is the binary.
   parameter store before it packages anything.
 - **Access per stack:** an IAM policy and an operators' group for each
   stack's parameter-store prefix.
+- **A firewall check:** `host ports` reads a Lightsail instance's port
+  states and fails unless HTTPS is open exactly to Cloudflare's ranges,
+  SSH only to the admin addresses, and nothing else is open.
+- **Runbooks:** a recurring deploy runbook for each live stack, run step
+  by step or a phase at a time, and `runbookkit`, the pieces a tool's own
+  runbooks keep needing.
 
 ## Commands
 
@@ -65,6 +71,7 @@ Your repository keeps the configuration; deployforge is the binary.
 | `db roles plan\|apply\|verify <app> <stack>` | Provision a stack's databases and roles |
 | `db snapshot plan\|apply\|verify\|list` | Snapshot the database server |
 | `db copy run\|verify\|promote <app> <stack>` | Move a stack's databases to another server: copy, compare row counts, switch its parameters |
+| `db import <app> <stack> <database> --file <dump>` | Load a data-only dump as the database's owner, in one transaction; rolled back without `--confirm` |
 | `zones validate\|verify\|get\|page\|schema` | Check DNS zones against their name servers |
 | `zones harden plan\|apply\|verify` | Apply the security baseline to Cloudflare zones |
 | `zones tls [<host>...]` | Check from outside that each host refuses TLS 1.1 and accepts TLS 1.2 |
@@ -72,8 +79,12 @@ Your repository keeps the configuration; deployforge is the binary.
 | `credentials check\|generate\|install\|review\|status\|record\|report\|validate\|…` | The fleet's credential registry: observe the stores, generate or install a value, review, record and report |
 | `credentials setup --system <app> --env <stack> list\|show\|run\|verify\|doc` | Set a stack's credentials up step by step, from a runbook built from the registry |
 | `credentials page <app> <stack>` | An HTML page of what the stack's credentials are, how each is made, whether it is recorded, and how to set them up |
+| `credentials preflight <app> <stack>` | The stack's secret prefix against the registry: present, missing and unlisted; `--record` records the present ones |
 | `iam plan\|apply\|verify\|policy [<app> <stack>]…` | Each stack's parameter-store IAM policy and operators' group; `apply` needs `--confirm`, `policy` prints one document offline |
 | `cloudflare-ips [--check]` | Refresh the committed Cloudflare ranges, or check this build's against the published ones |
+| `host ports <host> --admin-cidr <cidr>…` | Check a host's Lightsail firewall: 443 to Cloudflare, 22 to the admin addresses, nothing else |
+| `deploy runbook --app <app> --stack <stack> list\|prepare\|run\|state\|doc\|export\|…` | A live stack's recurring deploy runbook |
+| `fleet inventory\|format` | The fleet's inventory page, and the fleet document's format reference |
 
 ## Quick Start
 

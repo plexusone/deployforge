@@ -33,6 +33,11 @@ This guide is for Go developers who want deployforge inside their own tools. dep
 | `origincert` | Issue, list and revoke origin certificates, made on the host |
 | `dbroles`, `dbsnapshot` | Database and role plans with SCRAM verifiers and connection limits; snapshots of a Lightsail server |
 | `dbcopy` | A stack's databases copied to another server, row counts compared, and its parameters promoted |
+| `dbimport` | A data-only dump loaded into a stack's database as its owner, in one transaction |
+| `hostports` | A Lightsail instance's firewall checked against the CDN's ranges and the admin addresses |
+| `deployrunbook` | A live stack's recurring deploy runbook |
+| `runbookkit` | Remote quoting, install-from-console actions, permission lists, step needs, inputs and fixes for a tool's own runbooks |
+| `fleetpage` | The fleet's inventory page and the fleet document's format reference |
 | `credpage` | One app stack's credentials as an HTML page |
 | `deploy/preflight` | Before a deploy, the registry's secrets under the stack's prefix checked by name in the parameter store |
 | `stackiam` | Each stack's parameter-store IAM policy and operators' group: plan, apply, verify |
@@ -102,6 +107,10 @@ Every field is optional. A nil function uses the default, which is the real serv
 | `IAM` | Opens the clients the `iam` command uses. IAM and STS with the default AWS configuration when nil. |
 | `CredentialConnector` | Reaches the credential stores for the check before a deploy. credforge's, through the targets, when nil. |
 | `ReleaseEnv` | Extra environment for an app's release script, as `NAME=value`, from the running binary's path and the fleet document's. For scripts at older tags that read other names for them. None when nil. |
+| `ImportHook` | Adds a host tool's own flags and replacements to `db import`, such as an ID it looks up in the target database once the owner's connection and the host are known. None when nil. |
+| `HostPorts` | Opens the client `host ports` reads a firewall with. Lightsail with the default AWS configuration when nil. |
+| `RunbookTool` | How a deploy runbook's commands run the tool, such as a host tool's binary and its fleet flag. This program with `--fleet` when empty. |
+| `RunbookDir` | Where each stack's deploy runbook event log is kept. `deployments/runbooks` when empty. |
 
 Their types are:
 
@@ -114,6 +123,17 @@ OriginCA            func() (origincert.API, error)
 IAM                 func(c *cobra.Command) (stackiam.Clients, error)
 CredentialConnector func(*targets.File) credforge.Connector
 ReleaseEnv          func(self, fleet string) []string
+ImportHook          func(cmd *cobra.Command) cli.ImportReplacer
+HostPorts           func(c *cobra.Command) (hostports.API, error)
+RunbookTool         []string
+RunbookDir          string
+```
+
+An `ImportReplacer` receives the database's owner connection and a runner
+for commands on the via host, and returns the replacements to apply:
+
+```go
+type ImportReplacer func(ctx context.Context, dsn string, r dbimport.Remote, out io.Writer) ([]dbimport.Replacement, error)
 ```
 
 Replace a field to use another secret store or transport, or to test your tool with fakes.

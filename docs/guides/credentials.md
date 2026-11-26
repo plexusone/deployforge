@@ -152,6 +152,27 @@ deployforge credentials page example-app prod -o example-app-prod.html
 
 `page <app> <stack>` writes an HTML page of the credentials the stack needs, how each is made, where it is stored, whether the log records it, and the setup runbook. It holds no value. `--need` picks the needs to show; the default is `launch,later,optional`.
 
+## Preflight for one stack
+
+```bash
+deployforge credentials preflight example-app prod
+deployforge credentials preflight example-app prod --record
+```
+
+`preflight <app> <stack>` lists the stack's secret prefix and compares it with every active credential the registry stores there, as the check in `deploy ship` does, reading no value. It shows:
+
+- each credential present, with when its store last set it, and whether the event log records it;
+- each credential missing. One that is optional, by tag or by `need`, or needed only while another rotates (`need: rotation`), is never missing;
+- each name under the prefix no credential lists. A database move's values under `next/` and `previous/` are counted, not listed.
+
+Flags:
+
+- `--record`: record each present credential the log lacks as created, at its store's time.
+- `--include-planned`: compare planned credentials too, such as those of a stack not yet deployed.
+- `--require-recorded`: exit non-zero while a present credential is unrecorded.
+
+It exits non-zero when a credential is missing.
+
 ## The pre-flight in ship
 
 When the fleet document has a `credentials` section, `deploy ship` checks that every secret the registry stores under the stack's prefix is in the parameter store, by name, before it packages anything. A missing secret stops the deploy. Skip the check with `--no-preflight`.

@@ -28,6 +28,7 @@ The primary stack decides names. The unit and Unix user of the primary stack are
 - `address`: the address for SSH.
 - `addressFrom`: read the address from a Pulumi output instead. Give `address` or `addressFrom`, not both.
 - `sshUser`: the user to connect as, with sudo. `ubuntu` when empty.
+- `lightsailName`: the host's name as a Lightsail instance, for `host ports` to read its firewall.
 
 ```json
 {
@@ -171,3 +172,12 @@ Only `registry` is required. Every path is relative to the fleet document. `even
 ## What validate checks
 
 `validate` reports every problem at once. Among them: an unknown format version, a bad port range, a name, unit, host name or database used twice, a stack on an unknown host, a port outside the range or used on its host, a host name outside the app's domain, a secret prefix without `{stack}`, and a live stack without limits.
+
+## Pages
+
+```bash
+deployforge fleet inventory -o docs/inventory.md
+deployforge fleet format -o docs/fleet-format.md
+```
+
+`fleet inventory` writes a Markdown page of the fleet: each app's stacks with their host, host names, port, databases and status; each app's secret prefix, edge and labels; each stack's unit, Unix user and limits; and the apps' notes. `fleet format` writes this document's format reference from the Go types the schema is generated from, so it cannot drift. Commit both, and write them again when the fleet or deployforge changes.

@@ -235,6 +235,24 @@ Failure rules:
 
 The host steps run inside one request, so they have no hooks of their own.
 
+## Deploy runbook
+
+```bash
+deployforge deploy runbook --app example-app --stack prod list
+deployforge deploy runbook --app example-app --stack prod restart --note v1.2.3
+DEPLOY_SOURCE=--tag=v1.2.3 deployforge deploy runbook --app example-app --stack prod run 2
+deployforge deploy runbook --app example-app --stack prod doc --html -o deploy-example-app-prod.html
+```
+
+Each live stack has a recurring deploy runbook: one run per deploy, from the operator's shell to the recorded deploy. Its steps are:
+
+1. **Prepare:** the operator's shell (the SSH key in the agent, the AWS profile answering); the stack's secrets, with `credentials preflight --record` when the fleet names a registry; and a dry run.
+2. **Deploy:** `deploy ship`, with every host name checked from outside, then the deploy recorded: the stack's credentials marked deployed and the ledger committed.
+
+`DEPLOY_SOURCE` holds what to deploy: `--tag=v1.2.3`, or `--local` for the pushed commit on main. Begin each deploy after the first with `restart --note <release>`; earlier runs stay in the event log, so `state` says when the stack was last deployed and whether it finished. `run 2` runs the deploy phase in one go, and `prepare 2` says what it still needs. The event log is `deployments/runbooks/<app>-<stack>.events.json`; `export` writes the runbook as JSON.
+
+A tool embedding deployforge names its own command with `Options.RunbookTool`, and keeps the logs elsewhere with `Options.RunbookDir`. For its own runbooks, package `runbookkit` has remote quoting for ssh, install-from-console actions, permission lists, step needs derived from commands, inputs such as an SSH key in the agent or a session token, and fixes for the failures these runs meet.
+
 ## Release package
 
 `release package` writes a reproducible archive and its `.sha256` file. Your app's release script normally calls it:

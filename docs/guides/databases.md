@@ -82,3 +82,22 @@ deployforge db copy promote example-app prod --confirm
 deployforge deploy ship example-app prod --tag v1.2.0
 deployforge db copy run example-app prod --from previous --to live --confirm
 ```
+
+## Import a data-only dump
+
+```bash
+deployforge db import example-app prod app --file app-data.sql \
+  --replace org-local=org-1234 --replace http://app.localhost:8080=https://app.example.com
+deployforge db import example-app prod app --file app-data.sql --replace org-local=org-1234 --confirm
+```
+
+`db import <app> <stack> <database> --file <dump>` loads a plain data-only dump (`pg_dump --data-only`) into one of the stack's databases, such as the data a local copy of the app holds, once the stack's schema is in place:
+
+- It runs as the database's owner, with `psql` on the database server's via host, in one transaction. The owner's connection reaches the host on ssh's standard input.
+- Tables whose row-level security is forced on their owner have `FORCE` lifted for the load and put back in the same transaction.
+- It prints each table's row count after the load. Without `--confirm` the transaction is rolled back, so the counts show what the load would give and nothing changes.
+- A row whose key the database already has fails the whole load.
+- `--replace OLD=NEW` replaces text throughout the dump first, such as an ID that differs between the source and the stack, or a local host name. Repeat it for each.
+- The dump may hold no `psql` meta-command outside COPY data; pg_dump's `\restrict` and `\unrestrict` lines are dropped.
+
+A tool embedding deployforge can add its own flags and replacements with `Options.ImportHook`. See [Embedding](embedding.md).
