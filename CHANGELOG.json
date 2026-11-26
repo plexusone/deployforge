@@ -9,6 +9,39 @@
   ],
   "releases": [
     {
+      "version": "v0.3.1",
+      "date": "2026-11-26",
+      "highlights": [
+        {
+          "description": "Each stack's deploy runbook checks the host's firewall before a ship, and generated pages never name a local path"
+        }
+      ],
+      "added": [
+        {
+          "description": "Options.AdminCIDRs: host ports' default admin addresses, and a firewall check in the first step of each stack's deploy runbook when the host has a lightsailName",
+          "commit": "9f3f164"
+        }
+      ],
+      "fixed": [
+        {
+          "description": "A deploy runbook's page named the program that wrote it by its path, which under go run is a temporary build directory under the operator's home; it now names the runbook tool, or this program by name",
+          "commit": "cbf9357"
+        }
+      ],
+      "build": [
+        {
+          "description": "make lint runs golangci-lint with the organization's shared configuration, as CI does, so formatters such as gofmt run locally",
+          "commit": "cad7560"
+        }
+      ],
+      "documentation": [
+        {
+          "description": "The hosts, deploying and embedding guides describe the firewall check and AdminCIDRs; the README describes make test and make lint",
+          "commit": "9ff583e"
+        }
+      ]
+    },
+    {
       "version": "v0.3.0",
       "date": "2026-11-26",
       "highlights": [

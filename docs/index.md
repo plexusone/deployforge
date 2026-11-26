@@ -37,4 +37,4 @@ Then follow [Getting Started](guides/getting-started.md).
 - [Guides](guides/getting-started.md), from a first deploy to every command
 - [API reference](https://pkg.go.dev/github.com/plexusone/deployforge)
 - [Design](specs/initiatives/INIT-DEPLOYFORGE-001/PRD.md): requirements, plan and roadmap
-- [Releases](releases/changelog.md), the latest [v0.3.0](releases/v0.3.0.md)
+- [Releases](releases/changelog.md), the latest [v0.3.1](releases/v0.3.1.md)
