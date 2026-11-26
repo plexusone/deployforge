@@ -361,6 +361,16 @@ func credentialsPageCmd(files func() (*fleet.Fleet, credentialFiles, error), too
 func program() string {
 	self := os.Args[0]
 	base := filepath.Base(self)
+	// go run builds into a temporary directory; that path names the local
+	// machine and does not outlive the run, so the program's name stands in.
+	if tmp, err := filepath.EvalSymlinks(os.TempDir()); err == nil {
+		if abs, err := filepath.EvalSymlinks(self); err == nil && strings.HasPrefix(abs, tmp+string(filepath.Separator)) {
+			return base
+		}
+	}
+	if strings.Contains(filepath.ToSlash(self), "/go-build") {
+		return base
+	}
 	found, err := exec.LookPath(base)
 	if err != nil {
 		return self

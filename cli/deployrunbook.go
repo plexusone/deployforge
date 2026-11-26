@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	rbcli "github.com/plexusone/systemspec-runbook/cli"
@@ -47,7 +48,7 @@ func deployRunbookCmd(load func() (*fleet.Fleet, error), fleetPath *string, o Op
 			return runbookspec.RenderOptions{
 				Resolve:       func(key string) (string, error) { return "", fmt.Errorf("unknown link key %q", key) },
 				VerifyCommand: options().RunbookCommand + " verify {step}",
-				Generator:     program() + " deploy runbook doc",
+				Generator:     generatorTool(o.RunbookTool) + " deploy runbook doc",
 			}, nil
 		},
 		Root: ".",
@@ -99,4 +100,14 @@ func deployRunbookCmd(load func() (*fleet.Fleet, error), fleetPath *string, o Op
 	export.Flags().StringVarP(&out, "output", "o", "", "file to write; standard output when empty")
 	cmd.AddCommand(export)
 	return cmd
+}
+
+// generatorTool names the tool on a generated page: the runbook tool when
+// a host tool gives one, such as "bin/example", or this program's name,
+// never a path that names the machine the page was written on.
+func generatorTool(runbookTool []string) string {
+	if len(runbookTool) > 0 {
+		return runbookTool[0]
+	}
+	return filepath.Base(program())
 }
