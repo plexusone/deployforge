@@ -1014,6 +1014,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../releases/v0.3.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.3.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../releases/v0.3.0/" class="md-nav__link">
         
   
@@ -1268,7 +1296,7 @@
 <li>SSH (22) is open only to the <code>--admin-cidr</code> addresses;</li>
 <li>no other port is open.</li>
 </ul>
-<p>It reports each range missing or extra, and changes nothing. Run it after any change to the firewall. Lightsail replaces an instance's rules as a whole, and a tool that replaces them new-first, then deletes the old set, can close the ports it just opened: every site behind the host then times out while the host itself is healthy.</p>
+<p>It reports each range missing or extra, and changes nothing. A tool embedding deployforge can give the admin addresses once, with <code>Options.AdminCIDRs</code>, so <code>host ports &lt;host&gt;</code> needs no flags. Run it after any change to the firewall; each stack's deploy runbook also runs it before a ship (see <a href="../deploying/">Deploying</a>). Lightsail replaces an instance's rules as a whole, and a tool that replaces them new-first, then deletes the old set, can close the ports it just opened: every site behind the host then times out while the host itself is healthy.</p>
 
 
 

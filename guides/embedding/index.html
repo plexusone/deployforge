@@ -992,6 +992,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../releases/v0.3.1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.3.1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../releases/v0.3.0/" class="md-nav__link">
         
   
@@ -1412,6 +1440,10 @@
 <td>Opens the client <code>host ports</code> reads a firewall with. Lightsail with the default AWS configuration when nil.</td>
 </tr>
 <tr>
+<td><code>AdminCIDRs</code></td>
+<td>The addresses SSH should be open to: <code>host ports</code>' default for <code>--admin-cidr</code>, and the firewall check in each stack's deploy runbook. None when empty.</td>
+</tr>
+<tr>
 <td><code>RunbookTool</code></td>
 <td>How a deploy runbook's commands run the tool, such as a host tool's binary and its fleet flag. This program with <code>--fleet</code> when empty.</td>
 </tr>
@@ -1432,8 +1464,9 @@
 <a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="nx">ReleaseEnv</span><span class="w">          </span><span class="kd">func</span><span class="p">(</span><span class="nx">self</span><span class="p">,</span><span class="w"> </span><span class="nx">fleet</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="p">[]</span><span class="kt">string</span>
 <a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="nx">ImportHook</span><span class="w">          </span><span class="kd">func</span><span class="p">(</span><span class="nx">cmd</span><span class="w"> </span><span class="o">*</span><span class="nx">cobra</span><span class="p">.</span><span class="nx">Command</span><span class="p">)</span><span class="w"> </span><span class="nx">cli</span><span class="p">.</span><span class="nx">ImportReplacer</span>
 <a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="nx">HostPorts</span><span class="w">           </span><span class="kd">func</span><span class="p">(</span><span class="nx">c</span><span class="w"> </span><span class="o">*</span><span class="nx">cobra</span><span class="p">.</span><span class="nx">Command</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="nx">hostports</span><span class="p">.</span><span class="nx">API</span><span class="p">,</span><span class="w"> </span><span class="kt">error</span><span class="p">)</span>
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="nx">RunbookTool</span><span class="w">         </span><span class="p">[]</span><span class="kt">string</span>
-<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="nx">RunbookDir</span><span class="w">          </span><span class="kt">string</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="nx">AdminCIDRs</span><span class="w">          </span><span class="p">[]</span><span class="kt">string</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="nx">RunbookTool</span><span class="w">         </span><span class="p">[]</span><span class="kt">string</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="nx">RunbookDir</span><span class="w">          </span><span class="kt">string</span>
 </code></pre></div>
 <p>An <code>ImportReplacer</code> receives the database's owner connection and a runner
 for commands on the via host, and returns the replacements to apply:</p>
