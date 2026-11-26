@@ -1152,6 +1152,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../releases/v0.3.2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.3.2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../releases/v0.3.1/" class="md-nav__link">
         
   
@@ -1801,7 +1829,7 @@
 </code></pre></div>
 <p>Each live stack has a recurring deploy runbook: one run per deploy, from the operator's shell to the recorded deploy. Its steps are:</p>
 <ol>
-<li><strong>Prepare:</strong> the operator's shell (the SSH key in the agent, the AWS profile answering, and, when the tool gives admin addresses and the host its <code>lightsailName</code>, the host's firewall as <code>host ports</code> checks it); the stack's secrets, with <code>credentials preflight --record</code> when the fleet names a registry; and a dry run.</li>
+<li><strong>Prepare:</strong> the operator's shell (the SSH key in the agent, the AWS profile answering, the stack's unit on its host as <code>host setup --check</code> compares it, and, when the tool gives admin addresses and the host its <code>lightsailName</code>, the host's firewall as <code>host ports</code> checks it); the stack's secrets, with <code>credentials preflight --record</code> when the fleet names a registry; and a dry run.</li>
 <li><strong>Deploy:</strong> <code>deploy ship</code>, with every host name checked from outside, then the deploy recorded: the stack's credentials marked deployed and the ledger committed.</li>
 </ol>
 <p><code>DEPLOY_SOURCE</code> holds what to deploy: <code>--tag=v1.2.3</code>, or <code>--local</code> for the pushed commit on main. Begin each deploy after the first with <code>restart --note &lt;release&gt;</code>; earlier runs stay in the event log, so <code>state</code> says when the stack was last deployed and whether it finished. <code>run 2</code> runs the deploy phase in one go, and <code>prepare 2</code> says what it still needs. The event log is <code>deployments/runbooks/&lt;app&gt;-&lt;stack&gt;.events.json</code>; <code>export</code> writes the runbook as JSON.</p>
