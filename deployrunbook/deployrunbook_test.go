@@ -111,3 +111,31 @@ func TestBuildChecksTheFirewall(t *testing.T) {
 		}
 	}
 }
+
+// TestBuildChecksTheUnit checks that the operator's shell step checks the
+// stack's unit on its host, and that the runbook names the fix when the
+// unit is out of date.
+func TestBuildChecksTheUnit(t *testing.T) {
+	book, err := deployrunbook.Build(load(t), "example-app", "prod", deployrunbook.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got string
+	for _, c := range book.Steps()[0].Checks {
+		if c.ID == "unit" {
+			got = strings.Join(c.Command.Args, " ")
+		}
+	}
+	if got != "deployforge host setup example-app prod --check" {
+		t.Errorf("unit check %q", got)
+	}
+	fixed := false
+	for _, f := range book.Troubleshoot {
+		if strings.Contains(f.Fix, "deployforge host setup example-app prod --apply") {
+			fixed = true
+		}
+	}
+	if !fixed {
+		t.Errorf("no fix names host setup --apply: %+v", book.Troubleshoot)
+	}
+}

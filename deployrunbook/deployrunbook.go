@@ -138,7 +138,7 @@ func build(a fleet.App, s fleet.Stack, stack string, credentials bool, firewall 
 			{Text: setup},
 			{Text: "add the host's key to the SSH agent, with its passphrase: `ssh-add <key>`."},
 		},
-		Done: "the SSH agent holds the host's key and the AWS profile answers.",
+		Done: "the SSH agent holds the host's key, the AWS profile answers, and the stack's unit on its host is current.",
 		Checks: []rb.Check{
 			{ID: "ssh-agent", Description: "the SSH agent holds a key", Kind: rb.KindCommand,
 				Command: &rb.CommandCheck{Args: []string{"ssh-add", "-l"}}},
@@ -155,6 +155,12 @@ func build(a fleet.App, s fleet.Stack, stack string, credentials bool, firewall 
 			Description: firewall + "'s firewall admits HTTPS from the edge and SSH only from the admin addresses",
 			Kind:        rb.KindCommand, Command: &rb.CommandCheck{Args: args}})
 	}
+	// The stack's unit on its host must be the one the fleet document gives:
+	// a change to its limits, say, is installed with host setup --apply
+	// before the deploy that restarts the service under it.
+	prepare[0].Checks = append(prepare[0].Checks, rb.Check{ID: "unit",
+		Description: "the stack's systemd unit on its host is the one the fleet document gives",
+		Kind:        rb.KindCommand, Command: &rb.CommandCheck{Args: run("host", "setup", a.Name, stack, "--check")}})
 	if credentials {
 		prepare = append(prepare, rb.Step{
 			ID: "1.2", Title: "The stack's secrets", Owner: rb.OwnerAgent,
@@ -202,6 +208,11 @@ func build(a fleet.App, s fleet.Stack, stack string, credentials bool, firewall 
 			"whose CI has passed, or `--local` for the pushed commit on the app's main branch.\n\n"+
 			"**Run the deploy** with `%[1]s run 2`, or a step with `%[1]s run <step>`: each asks before every\n"+
 			"command, records the step and runs its checks.", runbook, sourceEnv),
+		Troubleshoot: []rb.Fix{{Match: `host setup --check: .* differs from the fleet document`,
+			Fix: fmt.Sprintf("The stack's unit on its host is out of date, such as after a change to its limits. Install the new one with `%s`, then run the step again; the deploy restarts the service under it.",
+				strings.Join(run("host", "setup", a.Name, stack, "--apply"), " "))},
+			{Match: `host setup --check: .* has no /etc/systemd/system/`,
+				Fix: fmt.Sprintf("The stack has no unit on its host yet. Prepare it with `%s`.", strings.Join(run("host", "setup", a.Name, stack, "--apply"), " "))}},
 		Variables: []rb.Variable{{Name: "source", Env: sourceEnv, Example: "--tag=v1.2.3",
 			Description: "what to deploy: --tag=<release tag>, or --local for the pushed commit on main"}},
 		Phases: []rb.Phase{
