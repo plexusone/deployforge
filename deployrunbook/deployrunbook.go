@@ -104,7 +104,9 @@ func build(a fleet.App, s fleet.Stack, stack string, credentials bool, o Options
 	if pattern == "" {
 		pattern = a.Name + "/" + stack + "/*"
 	}
-	ship := func(extra ...string) []string { return append(run("deploy", "ship", a.Name, stack, "{{source}}"), extra...) }
+	ship := func(extra ...string) []string {
+		return append(run("deploy", "ship", a.Name, stack, "{{source}}"), extra...)
+	}
 	var ready []rb.Check
 	for i, h := range s.Hosts {
 		ready = append(ready, rb.Check{ID: fmt.Sprintf("ready-%d", i+1), Description: h + " is ready from outside", Kind: rb.KindHTTP,
