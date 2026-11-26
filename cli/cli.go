@@ -18,6 +18,7 @@ import (
 	"github.com/plexusone/credforge/targets"
 	"github.com/spf13/cobra"
 
+	"github.com/plexusone/deployforge/dbimport"
 	"github.com/plexusone/deployforge/dbroles"
 	"github.com/plexusone/deployforge/dbsnapshot"
 	"github.com/plexusone/deployforge/deploy/deployer"
@@ -68,7 +69,18 @@ type Options struct {
 	// NAME=value, from this binary's path and the fleet document's: for
 	// scripts at older tags that read other names for them. None when nil.
 	ReleaseEnv func(self, fleet string) []string
+	// ImportHook adds a host tool's own replacements to db import: it may
+	// register flags on the command, and returns what turns their values
+	// into replacements once the database's owner connection and the host
+	// are known, such as an ID looked up in the target database. None when
+	// nil.
+	ImportHook func(cmd *cobra.Command) ImportReplacer
 }
+
+// ImportReplacer returns replacements for db import from the database it
+// loads into: dsn is its owner connection and r runs commands on the via
+// host. It may write what it found to out.
+type ImportReplacer func(ctx context.Context, dsn string, r dbimport.Remote, out io.Writer) ([]dbimport.Replacement, error)
 
 // originOpener is the option's Origin CA, or Cloudflare's.
 func originOpener(o Options) func() (origincert.API, error) {

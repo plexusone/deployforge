@@ -119,7 +119,7 @@ func dbCmd(load func() (*fleet.Fleet, error), o Options) *cobra.Command {
 			return verifyRoles(c, plan, srv.PSQL(sshKey))
 		},
 	})
-	root.AddCommand(roles, copyCmd(load, openParams), snapshotCmd(load, lightsailOpener(o)))
+	root.AddCommand(roles, copyCmd(load, openParams), importCmd(load, openParams, o.ImportHook), snapshotCmd(load, lightsailOpener(o)))
 	return root
 }
 
