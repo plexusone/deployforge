@@ -15,11 +15,14 @@ deployforge unit example-app prod
 ```bash
 deployforge host setup example-app prod            # print the script
 deployforge host setup example-app prod --apply    # run it on the host
+deployforge host setup example-app prod --check    # compare the host's unit, changing nothing
 ```
 
 The script makes the stack's Unix user, its `/opt` and `/etc` directories, its systemd unit, the rotation of its log files, and the `/etc/hosts` lines for its loopback host names. It is idempotent, so you can run it again. It never starts the service, because a stack has no release to run until its first deploy.
 
 `--apply` runs the script on the stack's host over SSH, with sudo. `--ssh-key` names the host's SSH private key, used through the agent `SSH_AUTH_SOCK` names.
+
+`--check` reads the unit installed on the host and compares it with the one the fleet document gives, comments and blank lines aside. It exits non-zero, naming the first line that differs, when they do not match, such as after a change to the stack's `limits`, and when the host has no unit yet. It changes nothing. Install the new unit with `--apply`; the next deploy restarts the service under it. Each stack's deploy runbook runs `--check` before it ships.
 
 ## Find a free port
 
