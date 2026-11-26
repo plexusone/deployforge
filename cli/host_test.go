@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -22,6 +23,7 @@ import (
 	"github.com/plexusone/deployforge/dbroles"
 	"github.com/plexusone/deployforge/deploy/cfranges"
 	"github.com/plexusone/deployforge/deploy/deployer"
+	"github.com/plexusone/deployforge/deploy/systemd"
 	"github.com/plexusone/deployforge/fleet"
 	"github.com/plexusone/deployforge/hostports"
 	"github.com/plexusone/deployforge/origincert"
@@ -33,6 +35,9 @@ type fakeTransport struct {
 	script string
 	// csr is what openssl req prints on the host.
 	csr string
+	// unit is the installed unit cat prints; with noUnit, cat fails.
+	unit   string
+	noUnit bool
 }
 
 func (f *fakeTransport) TempDir(context.Context) (string, error) { return "/tmp/tmp.abc", nil }
@@ -53,6 +58,12 @@ func (f *fakeTransport) Sudo(_ context.Context, argv []string, _ io.Reader, stdo
 		return err
 	case "openssl":
 		_, err := io.WriteString(stdout, f.csr)
+		return err
+	case "cat":
+		if f.noUnit {
+			return errors.New("exit status 1")
+		}
+		_, err := io.WriteString(stdout, f.unit)
 		return err
 	}
 	return nil
@@ -302,5 +313,48 @@ func TestHostPorts(t *testing.T) {
 	}
 	if _, err := host(open(), "web-1"); err == nil {
 		t.Error("no --admin-cidr was accepted")
+	}
+}
+
+// TestHostSetupCheck checks that --check passes for the unit the fleet
+// gives, whatever its comments, and fails, naming the fix, for one with
+// other limits or none at all.
+func TestHostSetupCheck(t *testing.T) {
+	f, err := fleet.Load(testFleet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unit, err := systemd.Render(f, "example-app", "prod")
+	if err != nil {
+		t.Fatal(err)
+	}
+	check := func(tr *fakeTransport) (string, error) {
+		cmd := New(Options{Fleet: testFleet, Dial: func(string) deployer.Dialer {
+			return func(fleet.Host) (deployer.Transport, error) { return tr, nil }
+		}})
+		var buf bytes.Buffer
+		cmd.SetOut(&buf)
+		cmd.SetErr(&buf)
+		cmd.SetArgs([]string{"host", "setup", "example-app", "prod", "--check"})
+		err := cmd.Execute()
+		return buf.String(), err
+	}
+	otherComments := "# written by another tool\n" + strings.ReplaceAll(string(unit), "\n#", "\n# reworded:")
+	if out, err := check(&fakeTransport{unit: otherComments}); err != nil || !strings.Contains(out, "matches the fleet document") {
+		t.Errorf("the same unit, other comments: %v\n%s", err, out)
+	}
+	stale := strings.Replace(string(unit), "MemoryMax=", "MemoryMax=1", 1)
+	if stale == string(unit) {
+		t.Fatal("the test fleet's unit has no MemoryMax")
+	}
+	if _, err := check(&fakeTransport{unit: stale}); err == nil || !strings.Contains(err.Error(), "differs from the fleet document") || !strings.Contains(err.Error(), "--apply") {
+		t.Errorf("a unit with other limits: %v", err)
+	}
+	if _, err := check(&fakeTransport{noUnit: true}); err == nil || !strings.Contains(err.Error(), "has no /etc/systemd/system/") {
+		t.Errorf("no unit: %v", err)
+	}
+	tr := &fakeTransport{unit: string(unit)}
+	if _, err := check(tr); err != nil || strings.Join(tr.calls, "|") != "sudo cat /etc/systemd/system/"+f.Unit(f.Apps[0], "prod")+".service" {
+		t.Errorf("check changed something: %v, calls %v", err, tr.calls)
 	}
 }

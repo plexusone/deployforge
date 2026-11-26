@@ -5,15 +5,18 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"io"
 	"net/netip"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/plexusone/deployforge/deploy/cfranges"
 	"github.com/plexusone/deployforge/deploy/deployer"
 	"github.com/plexusone/deployforge/deploy/host"
+	"github.com/plexusone/deployforge/deploy/systemd"
 	"github.com/plexusone/deployforge/fleet"
 	"github.com/plexusone/deployforge/hostports"
 )
@@ -23,14 +26,18 @@ func hostCmd(load func() (*fleet.Fleet, error), dial func(key string) deployer.D
 		Use:   "host",
 		Short: "Prepare an app stack's place on its host, and check a host's firewall",
 	}
-	var apply bool
+	var apply, check bool
 	var sshKey string
 	setup := &cobra.Command{
 		Use:   "setup <app> <stack>",
-		Short: "Print the stack's host-setup script, or with --apply run it on the stack's host",
+		Short: "Print the stack's host-setup script, with --apply run it on the stack's host, or with --check compare the host's unit",
 		Long: "The script makes the stack's Unix user, its /opt and /etc directories, its systemd unit, the\n" +
 			"rotation of its log files, and the /etc/hosts lines for its loopback host names. It is idempotent and\n" +
-			"never starts the service: a stack has no release to run until its first deploy.",
+			"never starts the service: a stack has no release to run until its first deploy.\n\n" +
+			"--check reads the unit installed on the host and compares it with the one the fleet document gives,\n" +
+			"comments and blank lines aside, and exits non-zero when they differ, such as after a change to the\n" +
+			"stack's limits. It changes nothing; --apply installs the new unit, and the next deploy restarts the\n" +
+			"service under it.",
 		Args: cobra.ExactArgs(2),
 		RunE: func(c *cobra.Command, args []string) (err error) {
 			f, err := load()
@@ -41,11 +48,14 @@ func hostCmd(load func() (*fleet.Fleet, error), dial func(key string) deployer.D
 			if err != nil {
 				return err
 			}
-			if !apply {
+			if apply && check {
+				return errors.New("host setup: give --apply or --check, not both")
+			}
+			if !apply && !check {
 				_, err := c.OutOrStdout().Write(script)
 				return err
 			}
-			_, st, err := f.Stack(args[0], args[1])
+			a, st, err := f.Stack(args[0], args[1])
 			if err != nil {
 				return err
 			}
@@ -56,6 +66,9 @@ func hostCmd(load func() (*fleet.Fleet, error), dial func(key string) deployer.D
 			tr, err := dial(sshKey)(h)
 			if err != nil {
 				return err
+			}
+			if check {
+				return checkUnit(c, tr, f, a, args[1], h.Name)
 			}
 			local, err := os.CreateTemp("", "deployforge-host-setup-*.sh")
 			if err != nil {
@@ -96,6 +109,7 @@ func hostCmd(load func() (*fleet.Fleet, error), dial func(key string) deployer.D
 		},
 	}
 	setup.Flags().BoolVar(&apply, "apply", false, "run the script on the stack's host over SSH, with sudo")
+	setup.Flags().BoolVar(&check, "check", false, "compare the unit installed on the stack's host with the fleet document's, changing nothing")
 	setup.Flags().StringVar(&sshKey, "ssh-key", cmp.Or(os.Getenv(EnvSSHKey), ""), "the host's SSH private key, used through the agent SSH_AUTH_SOCK names")
 	root.AddCommand(setup, hostPortsCmd(load, ports, adminCIDRs))
 	return root
@@ -175,4 +189,60 @@ func hostPortsCmd(load func() (*fleet.Fleet, error), open func(c *cobra.Command)
 	cmd.Flags().StringArrayVar(&admin, "admin-cidr", adminCIDRs, "an address SSH should be open to, as a CIDR such as 192.0.2.10/32; repeat for each; the tool's admin addresses when not given")
 	cmd.Flags().BoolVar(&ipv6, "ipv6", false, "expect HTTPS open to Cloudflare's IPv6 ranges too")
 	return cmd
+}
+
+// checkUnit compares the stack's unit installed on its host with the one
+// the fleet document gives, comments and blank lines aside, and fails with
+// the first line that differs.
+func checkUnit(c *cobra.Command, tr deployer.Transport, f *fleet.Fleet, a fleet.App, stack, host string) error {
+	want, err := systemd.Render(f, a.Name, stack)
+	if err != nil {
+		return err
+	}
+	unit := f.Unit(a, stack)
+	path := "/etc/systemd/system/" + unit + ".service"
+	var got bytes.Buffer
+	if err := tr.Sudo(c.Context(), []string{"cat", path}, nil, &got, io.Discard); err != nil {
+		return fmt.Errorf("host setup --check: %s has no %s; run host setup %s %s --apply", host, path, a.Name, stack)
+	}
+	if line, mine, theirs, same := firstDifference(unitLines(got.Bytes()), unitLines(want)); !same {
+		return fmt.Errorf("host setup --check: %s's %s differs from the fleet document's at line %d: the host has %q, the fleet gives %q; run host setup %s %s --apply, then deploy, which restarts the service under it",
+			host, path, line, mine, theirs, a.Name, stack)
+	}
+	_, err = fmt.Fprintf(c.OutOrStdout(), "%s's %s matches the fleet document\n", host, path)
+	return err
+}
+
+// unitLines are a unit file's lines without comments and blank lines,
+// which systemd does not read, so two units that differ only in them are
+// the same unit.
+func unitLines(b []byte) []string {
+	var out []string
+	for _, l := range strings.Split(string(b), "\n") {
+		t := strings.TrimSpace(l)
+		if t == "" || strings.HasPrefix(t, "#") || strings.HasPrefix(t, ";") {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
+}
+
+// firstDifference is the first line, counted from 1, where a and b differ,
+// with each side's line there ("" past its end); same is true when they do
+// not differ.
+func firstDifference(a, b []string) (line int, x, y string, same bool) {
+	for i := range max(len(a), len(b)) {
+		var la, lb string
+		if i < len(a) {
+			la = a[i]
+		}
+		if i < len(b) {
+			lb = b[i]
+		}
+		if la != lb {
+			return i + 1, la, lb, false
+		}
+	}
+	return 0, "", "", true
 }
