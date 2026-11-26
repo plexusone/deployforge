@@ -558,6 +558,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#check-a-hosts-firewall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check a host's firewall
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1003,6 +1014,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../releases/v0.3.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.3.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../releases/v0.2.0/" class="md-nav__link">
         
   
@@ -1151,6 +1190,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#check-a-hosts-firewall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Check a host's firewall
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1209,6 +1259,16 @@
 <a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="p">}</span>
 </code></pre></div>
 <p>Every command that reaches the host resolves the address when it needs it, by running <code>pulumi stack output</code> in <code>dir</code>. <code>pulumi</code> must be installed and logged in. The same form, <code>endpointFrom</code>, works for the database server's endpoint. The database administrator's password can come from a Pulumi secret with <code>adminPassword.pulumiConfig</code>. See <a href="../databases/">Databases</a>.</p>
+<h2 id="check-a-hosts-firewall">Check a host's firewall<a class="headerlink" href="#check-a-hosts-firewall" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>deployforge<span class="w"> </span>host<span class="w"> </span>ports<span class="w"> </span>web-1<span class="w"> </span>--admin-cidr<span class="w"> </span><span class="m">192</span>.0.2.10/32<span class="w"> </span>--admin-cidr<span class="w"> </span><span class="m">198</span>.51.100.7/32
+</code></pre></div>
+<p><code>host ports &lt;host&gt;</code> reads the Lightsail instance's port states, the host's <code>lightsailName</code> in the fleet document, and exits non-zero unless:</p>
+<ul>
+<li>HTTPS (443) is open exactly to Cloudflare's IPv4 ranges, and with <code>--ipv6</code> its IPv6 ranges too;</li>
+<li>SSH (22) is open only to the <code>--admin-cidr</code> addresses;</li>
+<li>no other port is open.</li>
+</ul>
+<p>It reports each range missing or extra, and changes nothing. Run it after any change to the firewall. Lightsail replaces an instance's rules as a whole, and a tool that replaces them new-first, then deletes the old set, can close the ports it just opened: every site behind the host then times out while the host itself is healthy.</p>
 
 
 

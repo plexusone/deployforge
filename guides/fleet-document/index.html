@@ -524,6 +524,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pages
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1025,6 +1036,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../releases/v0.3.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.3.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../releases/v0.2.0/" class="md-nav__link">
         
   
@@ -1195,6 +1234,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pages
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1273,6 +1323,7 @@
 <li><code>address</code>: the address for SSH.</li>
 <li><code>addressFrom</code>: read the address from a Pulumi output instead. Give <code>address</code> or <code>addressFrom</code>, not both.</li>
 <li><code>sshUser</code>: the user to connect as, with sudo. <code>ubuntu</code> when empty.</li>
+<li><code>lightsailName</code>: the host's name as a Lightsail instance, for <code>host ports</code> to read its firewall.</li>
 </ul>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="p">{</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;web-1&quot;</span><span class="p">,</span>
@@ -1520,6 +1571,11 @@
 <p>Only <code>registry</code> is required. Every path is relative to the fleet document. <code>events</code> and <code>reviews</code> default to <code>events.json</code> and <code>reviews.json</code> beside the registry. <code>targets</code> is a credforge targets file. See <a href="../credentials/">Credentials</a>.</p>
 <h2 id="what-validate-checks">What validate checks<a class="headerlink" href="#what-validate-checks" title="Permanent link">&para;</a></h2>
 <p><code>validate</code> reports every problem at once. Among them: an unknown format version, a bad port range, a name, unit, host name or database used twice, a stack on an unknown host, a port outside the range or used on its host, a host name outside the app's domain, a secret prefix without <code>{stack}</code>, and a live stack without limits.</p>
+<h2 id="pages">Pages<a class="headerlink" href="#pages" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>deployforge<span class="w"> </span>fleet<span class="w"> </span>inventory<span class="w"> </span>-o<span class="w"> </span>docs/inventory.md
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>deployforge<span class="w"> </span>fleet<span class="w"> </span>format<span class="w"> </span>-o<span class="w"> </span>docs/fleet-format.md
+</code></pre></div>
+<p><code>fleet inventory</code> writes a Markdown page of the fleet: each app's stacks with their host, host names, port, databases and status; each app's secret prefix, edge and labels; each stack's unit, Unix user and limits; and the apps' notes. <code>fleet format</code> writes this document's format reference from the Go types the schema is generated from, so it cannot drift. Commit both, and write them again when the fleet or deployforge changes.</p>
 
 
 

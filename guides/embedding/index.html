@@ -992,6 +992,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../releases/v0.3.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.3.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../releases/v0.2.0/" class="md-nav__link">
         
   
@@ -1251,6 +1279,26 @@
 <td>A stack's databases copied to another server, row counts compared, and its parameters promoted</td>
 </tr>
 <tr>
+<td><code>dbimport</code></td>
+<td>A data-only dump loaded into a stack's database as its owner, in one transaction</td>
+</tr>
+<tr>
+<td><code>hostports</code></td>
+<td>A Lightsail instance's firewall checked against the CDN's ranges and the admin addresses</td>
+</tr>
+<tr>
+<td><code>deployrunbook</code></td>
+<td>A live stack's recurring deploy runbook</td>
+</tr>
+<tr>
+<td><code>runbookkit</code></td>
+<td>Remote quoting, install-from-console actions, permission lists, step needs, inputs and fixes for a tool's own runbooks</td>
+</tr>
+<tr>
+<td><code>fleetpage</code></td>
+<td>The fleet's inventory page and the fleet document's format reference</td>
+</tr>
+<tr>
 <td><code>credpage</code></td>
 <td>One app stack's credentials as an HTML page</td>
 </tr>
@@ -1355,6 +1403,22 @@
 <td><code>ReleaseEnv</code></td>
 <td>Extra environment for an app's release script, as <code>NAME=value</code>, from the running binary's path and the fleet document's. For scripts at older tags that read other names for them. None when nil.</td>
 </tr>
+<tr>
+<td><code>ImportHook</code></td>
+<td>Adds a host tool's own flags and replacements to <code>db import</code>, such as an ID it looks up in the target database once the owner's connection and the host are known. None when nil.</td>
+</tr>
+<tr>
+<td><code>HostPorts</code></td>
+<td>Opens the client <code>host ports</code> reads a firewall with. Lightsail with the default AWS configuration when nil.</td>
+</tr>
+<tr>
+<td><code>RunbookTool</code></td>
+<td>How a deploy runbook's commands run the tool, such as a host tool's binary and its fleet flag. This program with <code>--fleet</code> when empty.</td>
+</tr>
+<tr>
+<td><code>RunbookDir</code></td>
+<td>Where each stack's deploy runbook event log is kept. <code>deployments/runbooks</code> when empty.</td>
+</tr>
 </tbody>
 </table>
 <p>Their types are:</p>
@@ -1366,6 +1430,14 @@
 <a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="nx">IAM</span><span class="w">                 </span><span class="kd">func</span><span class="p">(</span><span class="nx">c</span><span class="w"> </span><span class="o">*</span><span class="nx">cobra</span><span class="p">.</span><span class="nx">Command</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="nx">stackiam</span><span class="p">.</span><span class="nx">Clients</span><span class="p">,</span><span class="w"> </span><span class="kt">error</span><span class="p">)</span>
 <a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="nx">CredentialConnector</span><span class="w"> </span><span class="kd">func</span><span class="p">(</span><span class="o">*</span><span class="nx">targets</span><span class="p">.</span><span class="nx">File</span><span class="p">)</span><span class="w"> </span><span class="nx">credforge</span><span class="p">.</span><span class="nx">Connector</span>
 <a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="nx">ReleaseEnv</span><span class="w">          </span><span class="kd">func</span><span class="p">(</span><span class="nx">self</span><span class="p">,</span><span class="w"> </span><span class="nx">fleet</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="p">[]</span><span class="kt">string</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="nx">ImportHook</span><span class="w">          </span><span class="kd">func</span><span class="p">(</span><span class="nx">cmd</span><span class="w"> </span><span class="o">*</span><span class="nx">cobra</span><span class="p">.</span><span class="nx">Command</span><span class="p">)</span><span class="w"> </span><span class="nx">cli</span><span class="p">.</span><span class="nx">ImportReplacer</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="nx">HostPorts</span><span class="w">           </span><span class="kd">func</span><span class="p">(</span><span class="nx">c</span><span class="w"> </span><span class="o">*</span><span class="nx">cobra</span><span class="p">.</span><span class="nx">Command</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="nx">hostports</span><span class="p">.</span><span class="nx">API</span><span class="p">,</span><span class="w"> </span><span class="kt">error</span><span class="p">)</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="nx">RunbookTool</span><span class="w">         </span><span class="p">[]</span><span class="kt">string</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="nx">RunbookDir</span><span class="w">          </span><span class="kt">string</span>
+</code></pre></div>
+<p>An <code>ImportReplacer</code> receives the database's owner connection and a runner
+for commands on the via host, and returns the replacements to apply:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">type</span><span class="w"> </span><span class="nx">ImportReplacer</span><span class="w"> </span><span class="kd">func</span><span class="p">(</span><span class="nx">ctx</span><span class="w"> </span><span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span><span class="w"> </span><span class="nx">dsn</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">r</span><span class="w"> </span><span class="nx">dbimport</span><span class="p">.</span><span class="nx">Remote</span><span class="p">,</span><span class="w"> </span><span class="nx">out</span><span class="w"> </span><span class="nx">io</span><span class="p">.</span><span class="nx">Writer</span><span class="p">)</span><span class="w"> </span><span class="p">([]</span><span class="nx">dbimport</span><span class="p">.</span><span class="nx">Replacement</span><span class="p">,</span><span class="w"> </span><span class="kt">error</span><span class="p">)</span>
 </code></pre></div>
 <p>Replace a field to use another secret store or transport, or to test your tool with fakes.</p>
 <h2 id="environment-variables">Environment variables<a class="headerlink" href="#environment-variables" title="Permanent link">&para;</a></h2>

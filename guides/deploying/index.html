@@ -658,6 +658,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#deploy-runbook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploy runbook
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#release-package" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1141,6 +1152,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../releases/v0.3.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.3.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../releases/v0.2.0/" class="md-nav__link">
         
   
@@ -1410,6 +1449,17 @@
     <span class="md-ellipsis">
       
         Hooks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deploy-runbook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploy runbook
       
     </span>
   </a>
@@ -1715,10 +1765,23 @@
 <li>A failure of the <code>failed</code> hook is only logged.</li>
 </ul>
 <p>The host steps run inside one request, so they have no hooks of their own.</p>
+<h2 id="deploy-runbook">Deploy runbook<a class="headerlink" href="#deploy-runbook" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>deployforge<span class="w"> </span>deploy<span class="w"> </span>runbook<span class="w"> </span>--app<span class="w"> </span>example-app<span class="w"> </span>--stack<span class="w"> </span>prod<span class="w"> </span>list
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>deployforge<span class="w"> </span>deploy<span class="w"> </span>runbook<span class="w"> </span>--app<span class="w"> </span>example-app<span class="w"> </span>--stack<span class="w"> </span>prod<span class="w"> </span>restart<span class="w"> </span>--note<span class="w"> </span>v1.2.3
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="nv">DEPLOY_SOURCE</span><span class="o">=</span>--tag<span class="o">=</span>v1.2.3<span class="w"> </span>deployforge<span class="w"> </span>deploy<span class="w"> </span>runbook<span class="w"> </span>--app<span class="w"> </span>example-app<span class="w"> </span>--stack<span class="w"> </span>prod<span class="w"> </span>run<span class="w"> </span><span class="m">2</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>deployforge<span class="w"> </span>deploy<span class="w"> </span>runbook<span class="w"> </span>--app<span class="w"> </span>example-app<span class="w"> </span>--stack<span class="w"> </span>prod<span class="w"> </span>doc<span class="w"> </span>--html<span class="w"> </span>-o<span class="w"> </span>deploy-example-app-prod.html
+</code></pre></div>
+<p>Each live stack has a recurring deploy runbook: one run per deploy, from the operator's shell to the recorded deploy. Its steps are:</p>
+<ol>
+<li><strong>Prepare:</strong> the operator's shell (the SSH key in the agent, the AWS profile answering); the stack's secrets, with <code>credentials preflight --record</code> when the fleet names a registry; and a dry run.</li>
+<li><strong>Deploy:</strong> <code>deploy ship</code>, with every host name checked from outside, then the deploy recorded: the stack's credentials marked deployed and the ledger committed.</li>
+</ol>
+<p><code>DEPLOY_SOURCE</code> holds what to deploy: <code>--tag=v1.2.3</code>, or <code>--local</code> for the pushed commit on main. Begin each deploy after the first with <code>restart --note &lt;release&gt;</code>; earlier runs stay in the event log, so <code>state</code> says when the stack was last deployed and whether it finished. <code>run 2</code> runs the deploy phase in one go, and <code>prepare 2</code> says what it still needs. The event log is <code>deployments/runbooks/&lt;app&gt;-&lt;stack&gt;.events.json</code>; <code>export</code> writes the runbook as JSON.</p>
+<p>A tool embedding deployforge names its own command with <code>Options.RunbookTool</code>, and keeps the logs elsewhere with <code>Options.RunbookDir</code>. For its own runbooks, package <code>runbookkit</code> has remote quoting for ssh, install-from-console actions, permission lists, step needs derived from commands, inputs such as an SSH key in the agent or a session token, and fixes for the failures these runs meet.</p>
 <h2 id="release-package">Release package<a class="headerlink" href="#release-package" title="Permanent link">&para;</a></h2>
 <p><code>release package</code> writes a reproducible archive and its <code>.sha256</code> file. Your app's release script normally calls it:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>deployforge<span class="w"> </span>release<span class="w"> </span>package<span class="w"> </span>example-app<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span>--repo<span class="w"> </span>.<span class="w"> </span>--from<span class="w"> </span>build/<span class="w"> </span>--out<span class="w"> </span>dist
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>deployforge<span class="w"> </span>release<span class="w"> </span>package<span class="w"> </span>example-app<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span>--repo<span class="w"> </span>.<span class="w"> </span>--from<span class="w"> </span>build/<span class="w"> </span>--out<span class="w"> </span>dist
 </code></pre></div>
 <p>It checks that:</p>
 <ul>

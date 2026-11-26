@@ -615,6 +615,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#import-a-data-only-dump" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import a data-only dump
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1004,6 +1015,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../releases/v0.3.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.3.0
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../releases/v0.2.0/" class="md-nav__link">
         
   
@@ -1153,6 +1192,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#import-a-data-only-dump" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Import a data-only dump
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1238,6 +1288,21 @@
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>deployforge<span class="w"> </span>deploy<span class="w"> </span>ship<span class="w"> </span>example-app<span class="w"> </span>prod<span class="w"> </span>--tag<span class="w"> </span>v1.2.0
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>deployforge<span class="w"> </span>db<span class="w"> </span>copy<span class="w"> </span>run<span class="w"> </span>example-app<span class="w"> </span>prod<span class="w"> </span>--from<span class="w"> </span>previous<span class="w"> </span>--to<span class="w"> </span>live<span class="w"> </span>--confirm
 </code></pre></div>
+<h2 id="import-a-data-only-dump">Import a data-only dump<a class="headerlink" href="#import-a-data-only-dump" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>deployforge<span class="w"> </span>db<span class="w"> </span>import<span class="w"> </span>example-app<span class="w"> </span>prod<span class="w"> </span>app<span class="w"> </span>--file<span class="w"> </span>app-data.sql<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>--replace<span class="w"> </span>org-local<span class="o">=</span>org-1234<span class="w"> </span>--replace<span class="w"> </span>http://app.localhost:8080<span class="o">=</span>https://app.example.com
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>deployforge<span class="w"> </span>db<span class="w"> </span>import<span class="w"> </span>example-app<span class="w"> </span>prod<span class="w"> </span>app<span class="w"> </span>--file<span class="w"> </span>app-data.sql<span class="w"> </span>--replace<span class="w"> </span>org-local<span class="o">=</span>org-1234<span class="w"> </span>--confirm
+</code></pre></div>
+<p><code>db import &lt;app&gt; &lt;stack&gt; &lt;database&gt; --file &lt;dump&gt;</code> loads a plain data-only dump (<code>pg_dump --data-only</code>) into one of the stack's databases, such as the data a local copy of the app holds, once the stack's schema is in place:</p>
+<ul>
+<li>It runs as the database's owner, with <code>psql</code> on the database server's via host, in one transaction. The owner's connection reaches the host on ssh's standard input.</li>
+<li>Tables whose row-level security is forced on their owner have <code>FORCE</code> lifted for the load and put back in the same transaction.</li>
+<li>It prints each table's row count after the load. Without <code>--confirm</code> the transaction is rolled back, so the counts show what the load would give and nothing changes.</li>
+<li>A row whose key the database already has fails the whole load.</li>
+<li><code>--replace OLD=NEW</code> replaces text throughout the dump first, such as an ID that differs between the source and the stack, or a local host name. Repeat it for each.</li>
+<li>The dump may hold no <code>psql</code> meta-command outside COPY data; pg_dump's <code>\restrict</code> and <code>\unrestrict</code> lines are dropped.</li>
+</ul>
+<p>A tool embedding deployforge can add its own flags and replacements with <code>Options.ImportHook</code>. See <a href="../embedding/">Embedding</a>.</p>
 
 
 
