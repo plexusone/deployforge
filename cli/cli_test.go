@@ -155,3 +155,32 @@ func TestZonesValidateSchemaPageAndHardenNeedsAToken(t *testing.T) {
 		t.Errorf("harden without a token: %v", err)
 	}
 }
+
+func TestDeployRunbook(t *testing.T) {
+	dir := t.TempDir()
+	out, err := runIn(t, Options{Fleet: testFleet, RunbookDir: dir, RunbookTool: []string{"tool"}}, "deploy", "runbook", "--app", "example-app", "--stack", "prod", "list")
+	if err != nil || !strings.Contains(out, "2.1   blocked  operator  Ship it") {
+		t.Errorf("list: %v\n%s", err, out)
+	}
+	out, err = runIn(t, Options{Fleet: testFleet, RunbookTool: []string{"tool"}}, "deploy", "runbook", "--app", "example-app", "--stack", "prod", "export")
+	if err != nil || !json.Valid([]byte(out)) || !strings.Contains(out, `"tool"`) {
+		t.Errorf("export: %v", err)
+	}
+	if _, err := runIn(t, Options{Fleet: testFleet}, "deploy", "runbook", "list"); err == nil {
+		t.Error("no --app and --stack were accepted")
+	}
+	if _, err := runIn(t, Options{Fleet: testFleet}, "deploy", "runbook", "--app", "example-app", "--stack", "staging", "list"); err == nil {
+		t.Error("a planned stack has a deploy runbook")
+	}
+}
+
+func runIn(t *testing.T, o Options, args ...string) (string, error) {
+	t.Helper()
+	cmd := New(o)
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs(args)
+	err := cmd.Execute()
+	return out.String(), err
+}

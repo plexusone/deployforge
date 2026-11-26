@@ -79,6 +79,13 @@ type Options struct {
 	// HostPorts opens the client host ports reads a firewall with;
 	// Lightsail with the default AWS configuration when nil.
 	HostPorts func(c *cobra.Command) (hostports.API, error)
+	// RunbookTool is how a deploy runbook's commands run this tool, such
+	// as a host tool's binary and its fleet flag; this program with
+	// --fleet when empty.
+	RunbookTool []string
+	// RunbookDir holds each stack's deploy runbook event log;
+	// deployments/runbooks when empty.
+	RunbookDir string
 }
 
 // ImportReplacer returns replacements for db import from the database it
@@ -434,6 +441,7 @@ Environment:
 		},
 	})
 	root.AddCommand(shipCmd(load, fleetPath, &format, newDeployer, openStore, lightsailOpener(o), preflightFor(o, fleetPath), o.ReleaseEnv))
+	root.AddCommand(deployRunbookCmd(load, fleetPath, o))
 	root.AddCommand(&cobra.Command{
 		Use:   "unlock <app> <stack>",
 		Short: "Remove the stack's deploy lock, left by a deploy that was cut off",
